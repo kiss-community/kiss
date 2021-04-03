@@ -465,8 +465,8 @@ pkg_fix_deps() {
             case $line in
                 *NEEDED*\[*\] | *'=>'*)
                     # readelf: 0x0000 (NEEDED) Shared library: [libjson-c.so.5]
-                    line=${line##*[}
-                    line=${line%%]*}
+                    line=${line##*\[}
+                    line=${line%%\]*}
 
                     # ldd:     libjson-c.so.5 => /lib/libjson-c.so.5 ...
                     line=${line##*=> }
