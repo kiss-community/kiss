@@ -463,7 +463,7 @@ pkg_fix_deps() {
         # fullpath of a library when using readelf. Best use we have here is
         # saving it in a buffer, so we don't use the dynamic loader everytime we
         # need to reference it.
-        lddbuf=$(ldd -- "$file" 2>/dev/null)
+        lddbuf=$(ldd -- "$file" 2>/dev/null) ||:
 
         case $elf_cmd in
             *readelf)
