@@ -435,14 +435,6 @@ pkg_strip() {
     done 2>/dev/null ||:
 }
 
-pkg_fix_deps_fullpath() {
-    # Return the canonical path of libraries extracted by readelf.
-    while read -r dep _ rslv _; do
-        [ "$dep" = "$1" ] || continue
-        printf '%s\n' "$rslv"
-    done
-}
-
 pkg_fix_deps() {
     # Dynamically look for missing runtime dependencies by checking each
     # binary and library with 'ldd'. This catches any extra libraries and or
@@ -459,11 +451,19 @@ pkg_fix_deps() {
     find "$pkg_dir/${PWD##*/}/" -type f 2>/dev/null |
 
     while read -r file; do
-        # We call ldd regardless here, because we also use it to retrieve the
-        # fullpath of a library when using readelf. Best use we have here is
-        # saving it in a buffer, so we don't use the dynamic loader everytime we
-        # need to reference it.
-        lddbuf=$(ldd -- "$file" 2>/dev/null) ||:
+        # https://cgit.uclibc-ng.org/cgi/cgit/uclibc-ng.git/tree/utils/ldd.c#n489
+        case $elf_cmd in
+            *readelf)
+                # ... [Requesting program interpreter: /lib/ld-musl-x86_64.so.1] ...
+                interp_dir=$("$elf_cmd" -l "$file" 2>/dev/null) || continue
+
+                # /lib/ld-musl-x86_64.so.1] ...
+                interp_dir=${interp_dir#*: }
+
+                # /lib
+                interp_dir=${interp_dir%/*}
+            ;;
+        esac
 
         case $elf_cmd in
             *readelf)
@@ -471,49 +471,50 @@ pkg_fix_deps() {
             ;;
 
             *)
-                printf '%s\n' "$lddbuf"
+                ldd -- "$file"
             ;;
         esac 2>/dev/null |
 
         while read -r line; do
             case $line in
-                *NEEDED*\[*\] | *'=>'*)
+                *NEEDED*\[*\])
                     # readelf: 0x0000 (NEEDED) Shared library: [libjson-c.so.5]
                     line=${line##*\[}
                     line=${line%%\]*}
+                    line=$interp_dir/$line
+                ;;
 
-                    # Retrieve the fullpath of the library from our ldd buffer.
-                    case $elf_cmd in
-                        *readelf) line=$(printf '%s\n' "$lddbuf" |
-                                         pkg_fix_deps_fullpath "$line")
-                    esac
-
+                *'=>'*)
                     # ldd:     libjson-c.so.5 => /lib/libjson-c.so.5 ...
                     line=${line##*=> }
                     line=${line%% *}
+                ;;
 
-                    # Skip files owned by libc and POSIX.
-                    case ${line##*/} in
-                        ld-*           |\
-                        lib[cm].so*    |\
-                        libdl.so*      |\
-                        libpthread.so* |\
-                        librt.so*      |\
-                        libtrace.so*   |\
-                        libxnet.so*    |\
-                        ldd)
-                            continue
-                        ;;
+                *)
+                    continue
+                ;;
+            esac
 
-                        *)
-                            # Skip file if owned by current package
-                            pkg_owner -l "/${line#/}\$" "$PWD/manifest" &&
-                                continue
+            # Skip files owned by libc and POSIX.
+            case ${line##*/} in
+                ld-*           |\
+                lib[cm].so*    |\
+                libdl.so*      |\
+                libpthread.so* |\
+                librt.so*      |\
+                libtrace.so*   |\
+                libxnet.so*    |\
+                ldd)
+                    continue
+                ;;
 
-                            pkg_owner -l "/${line#/}\$" "$@" &&
-                                printf '%s\n' "$pkg_owner"
-                        ;;
-                    esac
+                *)
+                    # Skip file if owned by current package
+                    pkg_owner -l "/${line#/}\$" "$PWD/manifest" &&
+                        continue
+
+                    pkg_owner -l "/${line#/}\$" "$@" &&
+                        printf '%s\n' "$pkg_owner"
                 ;;
             esac
         done ||:
