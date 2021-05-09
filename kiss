@@ -219,10 +219,17 @@ pkg_sources() {
             log "$1" "Downloading $src"
             mkdir -p "$PWD/$dest"
 
+            # We don't want interrupt to exit immediately here, so we change the
+            # behaviour here.
+            trap pkg_clean INT
+
             curl "$src" -fLo "./${dest:-.}/${src##*/}" || {
                 rm -f "./${dest:-.}/${src##*/}"
                 die "$1" "Failed to download $src"
             }
+
+            # Restore the trap to the original value.
+            trap 'pkg_clean; exit 1' INT
 
         # Local source (relative).
         elif [ -e "$repo_dir/$src" ]; then
