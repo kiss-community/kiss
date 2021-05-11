@@ -687,7 +687,7 @@ pkg_build() {
         run_hook pre-build "$pkg" "$pkg_dir/$pkg"
 
         # Call the build script, log the output to the terminal and to a file.
-        # There's no PIPEFAIL in POSIX shelll so we must resort to tricks like
+        # There's no PIPEFAIL in POSIX shell so we must resort to tricks like
         # killing the script ourselves.
         { "$repo_dir/build" "$pkg_dir/$pkg" "$build_version" 2>&1 || {
             log "$pkg" "Build failed"
@@ -714,7 +714,7 @@ pkg_build() {
         find "$pkg_dir/$pkg/usr/lib" -name \*.la -exec rm -f {} + 2>/dev/null ||:
 
         # Remove this unneeded file from all packages as it is an endless
-        # source of conflicts. This is used with info pages we we do not support.
+        # source of conflicts. This is used with info pages which we do not support.
         rm -f "$pkg_dir/$pkg/usr/lib/charset.alias"
 
         # Create the manifest file early and make it empty. This ensures that
@@ -1661,7 +1661,7 @@ main() {
     )"} || elf_cmd=ldd
 
     # Store the date and time of script invocation to be used as the name of
-    # the log files the package manager creates uring builds.
+    # the log files the package manager creates during builds.
     time=$(date +%Y-%m-%d-%H:%M)
 
     # Make note of the user's current ID to do root checks later on.
