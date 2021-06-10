@@ -371,7 +371,9 @@ pkg_depends() {
         # Recurse through the dependencies of the child packages.
         while read -r dep _ || [ "$dep" ]; do
             [ "${dep##\#*}" ] && pkg_depends "$dep" '' "$3"
-        done 2>/dev/null < "$(pkg_find "$1")/depends" ||:
+        done 2>/dev/null <<EOF ||:
+$(${KISS_DEPEND_HOOK:-cat} "$(pkg_find "$1")/depends")
+EOF
 
         # After child dependencies are added to the list,
         # add the package which depends on them.
