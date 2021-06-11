@@ -369,8 +369,8 @@ pkg_depends() {
         [ "$3" ] && [ -z "$2" ] && (pkg_list "$1" >/dev/null) && return
 
         # Recurse through the dependencies of the child packages.
-        while read -r dep _ || [ "$dep" ]; do
-            [ "${dep##\#*}" ] && pkg_depends "$dep" '' "$3"
+        while read -r dep make || [ "$dep" ]; do
+            { [ "make" != "$make" ] || ! pkg_cache "$1"; } && [ "${dep##\#*}" ] && pkg_depends "$dep" '' "$3"
         done 2>/dev/null < "$(pkg_find "$1")/depends" ||:
 
         # After child dependencies are added to the list,
