@@ -20,6 +20,23 @@ die() {
     exit 1
 }
 
+concat() {
+    # input: arr="boom! 1 2 3"; sep=', '
+    arr=$1; sep=$2
+
+    set --
+
+    # Place sep between strings and reverse final result.
+    for s in $arr; do
+        set -- "$sep$s$*"
+    done
+
+    arr=$*
+
+    # output: 3, 2, 1, boom!
+    printf '%s' "${arr#$sep}"
+}
+
 contains() {
     # Check if a "string list" contains a word.
     case " $1 " in *" $2 "*) return 0; esac; return 1
@@ -361,45 +378,6 @@ pkg_extract() {
     done < "$repo_dir/sources"
 }
 
-pkg_depends() {
-    # Resolve all dependencies and generate an ordered list. The deepest
-    # dependencies are listed first and then the parents in reverse order.
-    contains "$deps" "$1" || {
-        # Filter out non-explicit, aleady installed dependencies.
-        [ "$3" ] && [ -z "$2" ] && (pkg_list "$1" >/dev/null) && return
-
-        # Recurse through the dependencies of the child packages.
-        while read -r dep _ || [ "$dep" ]; do
-            [ "${dep##\#*}" ] && pkg_depends "$dep" '' "$3"
-        done 2>/dev/null < "$(pkg_find "$1")/depends" ||:
-
-        # After child dependencies are added to the list,
-        # add the package which depends on them.
-        [ "$2" = explicit ] || deps="$deps $1 "
-    }
-}
-
-pkg_order() {
-    # Order a list of packages based on dependence and take into account
-    # pre-built tarballs if this is to be called from 'kiss i'.
-    order=; redro=; deps=
-
-    for pkg do case $pkg in
-        /*.tar.*) deps="$deps $pkg " ;;
-        *.tar.*)  deps="$deps $ppwd/$pkg " ;;
-        *)        pkg_depends "$pkg" raw
-    esac done
-
-    # Filter the list, only keeping explicit packages. The purpose of these
-    # two loops is to order the argument list based on dependence.
-    for pkg in $deps; do
-        contains "$*" "$pkg" || contains "$*" "${pkg##"$ppwd/"}" &&
-            order="$order $pkg " redro=" $pkg $redro"
-    done
-
-    deps=
-}
-
 pkg_strip() {
     # Strip package binaries and libraries. This saves space on the system as
     # well as on the tarballs we ship for installation.
@@ -606,34 +584,233 @@ pkg_tar() (
     run_hook post-package "$1"
 )
 
+add_vertex() {
+    vertex_edges=; vertex=$1
+
+    for vertex_edges in $graph; do
+        _vertex=${vertex_edges%%:*}
+
+        if [ "$_vertex" = "$vertex" ]; then
+            return 1
+        fi
+    done
+
+    graph="$graph $vertex:"
+}
+
+add_edge() {
+    # TODO implement fast path if vertex is added?
+    add_vertex "$1" ||:
+    add_vertex "$2" ||:
+
+    vertex=$1; edge=$2; vertex_edges=; _graph=
+
+    # Iterate over dependency graph until we find specified vertex.
+    for vertex_edges in $graph; do
+        # pkg1:pkg2,pkg3 -> pkg1
+        _vertex=${vertex_edges%%:*}
+
+        # If vertex withith graph not equal to specified vertex, add vertex and
+        # edges to new graph and continue.
+        if [ "$_vertex" != "$vertex" ]; then
+            _graph="$_graph $vertex_edges"
+            continue
+        fi
+
+        # pkg1:pkg2,pkg3 -> pkg2,pkg3
+        _edges=${vertex_edges#*:}
+
+        # pkg2,pkg3 -> pkg2 pkg3
+        #
+        # Word-splitting is intentional.
+        # shellcheck disable=2046,2086
+        { IFS=,; set -- $_edges; unset IFS; }
+
+        # If edges already contains specified edge, return.
+        if contains "$*" "$edge"; then
+            return 1
+        fi
+
+        # Append specified edge to vertex and add it to graph.
+        _graph="$_graph $_vertex:${_edges:+$_edges,}$edge"
+    done
+
+    # Update graph with new one.
+    graph=$_graph
+}
+
+get_edges() {
+    # Iterate over dependency graph until we find specified vertex.
+    for vertex_edges in $graph; do
+        # pkg1:pkg2,pkg3 -> pkg1
+        vertex=${vertex_edges%%:*}
+
+        # If vertex withith graph equal to specified vertex, print the edges
+        # and abort the iteration.
+        if [ "$vertex" = "$1" ]; then
+            # pkg1:pkg2,pkg3 -> pkg2,pkg3
+            edges=${vertex_edges#*:}
+
+            printf '%s' "$edges"
+            return 0
+        fi
+    done
+}
+
+pkg_depgraph() {
+    add_vertex "$1" ||:
+
+    # Recurse through the dependencies of the child packages.
+    while read -r dep make || [ "$dep" ]; do
+        # Skip comments.
+        case $dep in \#*) continue; esac
+
+        # Skip build-time dependency if package is already built.
+        # Thanks TAAPArthur for working on this.
+        [ "$make" ] && pkg_cache "$1" && continue
+
+        # If action is update and version matches with installed one, skip
+        # the dependency. Thanks TAAPArthur for reporting bug.
+        [ -z "$2" ] && (
+            pkg_list "$dep" >/dev/null && {
+                # There is no modification in subshell, just checking.
+                # shellcheck disable=2030
+                [ -z "$pkg_update" ] && exit
+
+                read -r sver srel < "$dep/version"
+                read -r rver rrel < "$(pkg_find "$dep")/version"
+
+                [ "$sver" = "$rver" ] && [ "$srel" = "$rrel" ]
+            }
+        ) && continue
+
+        # If dep successfully added to graph, recurse through the
+        # dependencies of dep.
+        add_edge "$1" "$dep" && pkg_depgraph "$dep"
+    done 2>/dev/null < "$(pkg_find "$1")/depends" ||:
+}
+
+pkg_toposort() {
+    # If vertex already processed, return.
+    if contains "$black" "$1"; then
+        return 0
+    fi
+
+    # Color vertex into grey to keep record of possible circular dependencies.
+    grey=" $1 $grey"
+
+    # pkg2,pkg3 -> pkg2 pkg3
+    #
+    # Word-splitting is intentional.
+    # shellcheck disable=2046,2086
+    { IFS=,; set -- $2; unset IFS; }
+
+    # Perform depth-first search.
+    for pkg do
+        if contains "$grey" "$pkg"; then
+            die "Circular dependency chain: $(concat "$pkg $grey" '->')"
+        fi
+
+        pkg_toposort "$pkg" "$(get_edges "$pkg")"
+    done
+
+    # Word-splitting is intentional.
+    # shellcheck disable=2046,2086
+    set -- $grey
+
+    # Color vertex into black to keep record of already processed vertices.
+    black="$black $1 "
+
+    if ! contains "$explicit" "$1"; then
+        deps="$deps $1 "
+    fi
+
+    shift 1
+    grey=$*
+}
+
+pkg_order() {
+    # Order a list of packages based on dependence and take into account
+    # pre-built tarballs if this is to be called from 'kiss i'.
+    order=; redro=; deps=; graph=; grey=; black=
+
+    for pkg do case $pkg in
+        /*.tar.*) deps="$deps $pkg " ;;
+        *.tar.*)  deps="$deps $ppwd/$pkg " ;;
+        *)        pkg_depgraph "$pkg" raw
+    esac done
+
+    # Perform topological sort of graph to construct dependency chain.
+    for vertex_edges in $graph; do
+        # pkg1:pkg2,pkg3 -> pkg1
+        vertex=${vertex_edges%%:*}
+
+        # pkg1:pkg2,pkg3 -> pkg2,pkg3
+        edges=${vertex_edges#*:}
+
+        pkg_toposort "$vertex" "$edges"
+    done
+
+    # Filter the list, only keeping explicit packages. The purpose of these
+    # two loops is to order the argument list based on dependence.
+    for pkg in $deps; do
+        contains "$*" "$pkg" || contains "$*" "${pkg##"$ppwd/"}" &&
+            order="$order $pkg " redro=" $pkg $redro"
+    done
+
+    deps=; graph=; grey=; black=
+}
+
 pkg_build() {
     # Build packages and turn them into packaged tarballs.
 
     log "Resolving dependencies"
 
-    nexplicit="$#"
-
     # Mark packages passed on the command-line separately from those
     # detected as dependencies. We need to treat explicitly passed packages
     # differently from those pulled in as dependencies.
     #
-    # This also resolves all dependencies and stores the result in '$deps'.
-    # Any duplicates are also filtered out.
+    # This also creates dependency graph to properly handle circular
+    # dependencies. Any duplicates are also filtered out.
     for pkg do
         contains "$explicit" "$pkg" || {
-            pkg_depends "$pkg" explicit filter
+            pkg_depgraph "$pkg"
             explicit="$explicit $pkg "
         }
     done
 
+    # Word-splitting is intentional.
+    # shellcheck disable=2046,2086
+    set -- $explicit
+    nexplicit=$#
+
+    # Perform topological sort of graph to construct dependency chain.
+    # The final result will be stored in '$deps'.
+    #
+    # The format of dependency graph is: <vertex>:<edge>,<edge2> ...
+    # Where ':' is a vertex separator and ',' is an edge separator.
+    for vertex_edges in $graph; do
+        # pkg1:pkg2,pkg3 -> pkg1
+        vertex=${vertex_edges%%:*}
+
+        # pkg1:pkg2,pkg3 -> pkg2,pkg3
+        edges=${vertex_edges#*:}
+
+        pkg_toposort "$vertex" "$edges"
+    done
+
     # If this is an update, don't always build explicitly passsed packages
     # and instead install pre-built binaries if they exist.
+    #
+    # There is no modification in subshell, so there is no change loss.
+    # shellcheck disable=2031
     [ "$pkg_update" ] || explicit_build=$explicit
 
     # If an explicit package is a dependency of another explicit package,
     # remove it from the explicit list as it needs to be installed as a
     # dependency.
     for pkg do
+        # FIXME this doesn't work
         contains "$deps" "$pkg" || explicit2=" $explicit2 $pkg "
     done
     explicit=$explicit2
