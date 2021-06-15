@@ -656,6 +656,9 @@ get_edges() {
 pkg_depgraph() {
     add_vertex "$1" ||:
 
+    # Cache result of pkg_cache function.
+    pkg_cache "$1" && pkg_cached=1 || pkg_cached=
+
     # Recurse through the dependencies of the child packages.
     while read -r dep make || [ "$dep" ]; do
         # Skip comments.
@@ -663,7 +666,7 @@ pkg_depgraph() {
 
         # Skip build-time dependency if package is already built.
         # Thanks TAAPArthur for working on this.
-        [ "$make" ] && pkg_cache "$1" && continue
+        [ "$make" ] && [ "$pkg_cached" ] && continue
 
         [ -z "$2" ] && (
             pkg_list "$dep" >/dev/null || exit
@@ -724,7 +727,7 @@ pkg_toposort() {
         deps="$deps $1 "
     fi
 
-    shift 1
+    shift
     grey=$*
 }
 
