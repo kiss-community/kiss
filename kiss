@@ -21,20 +21,16 @@ die() {
 }
 
 concat() {
-    # input: arr="boom! 1 2 3"; sep=', '
-    arr=$1; sep=$2
+    # input: $1="boom! 1 2 3"; $2=', '
+    arr=
 
-    set --
-
-    # Place sep between strings and reverse final result.
-    for s in $arr; do
-        set -- "$sep$s$*"
+    # Place $2 between strings and reverse final result.
+    for s in $1; do
+        arr="$2$s$arr"
     done
 
-    arr=$*
-
     # output: 3, 2, 1, boom!
-    printf '%s' "${arr#$sep}"
+    printf '%s' "${arr#$2}"
 }
 
 contains() {
