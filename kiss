@@ -665,19 +665,22 @@ pkg_depgraph() {
         # Thanks TAAPArthur for working on this.
         [ "$make" ] && pkg_cache "$1" && continue
 
-        # If action is update and version matches with installed one, skip
-        # the dependency. Thanks TAAPArthur for reporting bug.
         [ -z "$2" ] && (
-            pkg_list "$dep" >/dev/null && {
-                # There is no modification in subshell, just checking.
-                # shellcheck disable=2030
-                [ -z "$pkg_update" ] && exit
+            pkg_list "$dep" >/dev/null || exit
 
-                read -r sver srel < "$dep/version"
-                read -r rver rrel < "$(pkg_find "$dep")/version"
+            # If dependency is installed and action isn't update, skip it.
+            #
+            # There is no modification in subshell, just checking.
+            # https://github.com/koalaman/shellcheck/issues/2217
+            # shellcheck disable=2030
+            [ -z "$pkg_update" ] && exit
 
-                [ "$sver" = "$rver" ] && [ "$srel" = "$rrel" ]
-            }
+            read -r sver srel < "$dep/version"
+            read -r rver rrel < "$(pkg_find "$dep")/version"
+
+            # If action is update and version matches with installed one, skip
+            # the dependency. Thanks TAAPArthur for reporting bug.
+            [ "$sver" = "$rver" ] && [ "$srel" = "$rrel" ]
         ) && continue
 
         # If dep successfully added to graph, recurse through the
@@ -798,7 +801,8 @@ pkg_build() {
     # If this is an update, don't always build explicitly passsed packages
     # and instead install pre-built binaries if they exist.
     #
-    # There is no modification in subshell, so there is no change loss.
+    # There is no modification in subshell, therefore no change loss.
+    # https://github.com/koalaman/shellcheck/issues/2217
     # shellcheck disable=2031
     [ "$pkg_update" ] || explicit_build=$explicit
 
