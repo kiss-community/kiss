@@ -868,7 +868,7 @@ pkg_conflicts() {
     # Store the list of found conflicts in a file as we'll be using the
     # information multiple times. Storing things in the cache dir allows
     # us to be lazy as they'll be automatically removed on script end.
-    grep -Fxf "$mak_dir/$pid-m" -- "$@" 2>/dev/null > "$mak_dir/$pid-c" ||:
+    sed '/\/$/d' "$@" | sort "$mak_dir/$pid-m" - | uniq -d > "$mak_dir/$pid-c" ||:
 
     # Enable alternatives automatically if it is safe to do so.
     # This checks to see that the package that is about to be installed
@@ -899,7 +899,7 @@ pkg_conflicts() {
         # this work.
         #
         # Pretty nifty huh?
-        while IFS=: read -r _ con; do
+        while read -r con; do
             printf '%s\n' "Found conflict $con"
 
             # Create the "choices" directory inside of the tarball.
