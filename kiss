@@ -1002,51 +1002,18 @@ pkg_install_files() {
     # Reverse the manifest file so that we start shallow and go deeper as we
     # iterate over each item. This is needed so that directories are created
     # going down the tree.
-    sort "$2/$pkg_db/${2##*/}/manifest" |
+    sort "$2/$pkg_db/${2##*/}/manifest" | cut -d"/" -f1-2 | sort -u |
 
     while read -r line; do
-        # Grab the octal permissions so that directory creation
-        # preserves permissions.
-        # See: [2] at top of script.
-        rwx=$(ls -ld "$2/$line") oct='' b='' o=0
-
-        # Convert the output of 'ls' (rwxrwx---) to octal. This is simply
-        # a 1-9 loop with the second digit being the value of the field.
-        for c in 14 22 31 44 52 61 74 82 91; do
-            rwx=${rwx#?}
-
-            case $rwx in
-                [rwx]*): "$((o+=${c#?}))" ;;
-                 [st]*): "$((o+=1))" "$((b+=4 / (${c%?}/3)))" ;;
-                 [ST]*): "$((b+=1))" ;;
-            esac
-
-            [ "$((${c%?} % 3))" = 0 ] && oct=$oct$o o=0
-        done
-
         # Copy files and create directories (preserving permissions),
         # skipping anything located in /etc/.
         #
         # The 'test' will run with '-e' for no-overwrite and '-z'
         # for overwrite.
-        case $line in /etc/*) ;;
-            */)
-                # Skip directories if they already exist in the file system.
-                # (Think /usr/bin, /usr/lib, etc).
-                [ -d "$KISS_ROOT/$line" ] || mkdir -m "$oct" "$KISS_ROOT/$line"
-            ;;
-
+        case $line in 
+            /etc) ;;
             *)
-                # Skip directories as they're likely symlinks in this case.
-                # Pure directories in manifests have a suffix of '/'.
-                [ -d "$KISS_ROOT/$line" ] || test "$1" "$KISS_ROOT/$line" || {
-                    cp -fP "$2/$line" "$KISS_ROOT/$line"
-
-                    # Skip changing permissions of symlinks. This prevents
-                    # errors when the symlink exists prior to the target.
-                    [ -h "$KISS_ROOT/$line" ] ||
-                        chmod "$b$oct" "$KISS_ROOT/$line"
-                }
+                cp -Rfp "$2/$line" "$KISS_ROOT/"
         esac
     done ||:
 }
