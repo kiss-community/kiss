@@ -275,55 +275,10 @@ pkg_extract() {
                 } || die "$1" "Failed to clone $src"
             ;;
 
-            # Tarballs of any kind. This is a shell equivalent of
-            # GNU tar's '--strip-components 1'.
+            # Tarballs of any kind.
             *://*.tar|*://*.tar.??|*://*.tar.???|*://*.tar.????|*://*.t?z)
-                # Decompress the archive to a temporary .tar archive.
-                decompress "$src_dir/$1/${dest:-.}/${src##*/}" > .ktar
-
-                # Extract the tar archive to the current directory.
-                tar xf .ktar || die "$1" "Couldn't extract ${src##*/}"
-
-                # Iterate over all directories in the first level of the
-                # tarball's manifest. This is our equivalent of GNU tar's
-                # '--strip-components 1'.
-                tar tf .ktar | while IFS=/ read -r dir _; do
-                    # Some tarballs contain './' as the top-level directory,
-                    # we need to skip these occurances.
-                    [ -d "${dir#.}" ] || continue
-
-                    # Move the directory to prevent naming conflicts between
-                    # the child and parent
-                    mv -f "$dir" "$pid-$dir"
-
-                    # First attempt to move all files up a directory level,
-                    # if any files/directories fail (due to mv's lack of
-                    # directory merge capability), simply do the exercise
-                    # again and copy-merge the remaining files/directories.
-                    #
-                    # We can't use '-exec {} +' with any arguments between
-                    # the '{}' and '+' as this is not POSIX. We must also
-                    # use '$0' and '$@' to reference all arguments.
-                    #
-                    # Using only '$@' causes a single file from each
-                    # invocation to be left out of the list. Weird, right?
-                    {
-                        find "$pid-$dir/." ! -name . -prune \
-                            -exec sh -c 'mv -f "$0" "$@" .' {} + ||
-
-                        find "$pid-$dir/." ! -name . -prune \
-                            -exec sh -c 'cp -fRp "$0" "$@" .' {} +
-                    } 2>/dev/null
-
-                    # Remove the directory now that all files have been
-                    # transferred out of it. This can't be a simple 'rmdir'
-                    # as we may leave files in here due to above.
-                    rm -rf "$pid-$dir"
-                done
-
-                # Clean up after ourselves and remove the temporary tar
-                # archive we've created. Not needed at all really.
-                rm -f .ktar
+                decompress "$src_dir/$1/${dest:-.}/${src##*/}" | pax -r -s '!^[^/]*/!!' ||
+                    die "$1" "Couldn't extract ${src##*/}"
             ;;
 
             # Zip archives.
@@ -593,7 +548,7 @@ pkg_tar() (
     cd "$pkg_dir/$1"
 
     # Create a tarball from the contents of the built package.
-    tar cf - . | case ${KISS_COMPRESS:=gz} in
+    pax -w . | case ${KISS_COMPRESS:=gz} in
         bz2)  bzip2 -z ;;
         gz)   gzip -6  ;;
         lzma) lzma -z  ;;
@@ -1224,7 +1179,7 @@ pkg_install() {
     # then "installed" to the filesystem. Running this step as soon as possible
     # allows us to also check the validity of the tarball and bail out early
     # if needed.
-    decompress "$tar_file" | tar xf -
+    decompress "$tar_file" | pax -r
 
     # Naively assume that the existence of a manifest file is all that
     # determines a valid KISS package from an invalid one. This should be a
