@@ -96,6 +96,16 @@ decompress() {
     esac < "$1"
 }
 
+sum_type() {
+    if [ -f "$1" ]; then
+        _chk_b3sum=
+        _chk_file=$1
+    else
+        _chk_b3sum=false
+        _chk_file=$1s
+    fi
+}
+
 sh256() {
     # There's no standard utility to generate sha256 checksums.
     # This is a simple wrapper around sha256sum, sha256, shasum,
@@ -107,6 +117,7 @@ sh256() {
 
     if [ ! -d "$1" ] && [ -e "$1" ]; then
         hash=$(
+            "${_chk_b3sum:-b3sum}" "$1" ||
             sha256sum               "$1" ||
             sha256 -r               "$1" ||
             openssl dgst -sha256 -r "$1" ||
@@ -576,8 +587,8 @@ pkg_etcsums() (
     # This can't be a simple 'find -exec' as 'sh256' is a shell function
     # and not a real command of any kind. This is the shell equivalent.
     find etc ! -type d | sort | while read -r line; do
-        sh256 "$line"
-    done > "$pkg_dir/$1/$pkg_db/$1/etcsums"
+        _chk_b3sum=; sh256 "$line"
+    done > "$pkg_dir/$1/$pkg_db/$1/etcsum"
 )
 
 pkg_tar() (
@@ -730,7 +741,7 @@ pkg_build() {
 
         # If the package contains '/etc', add a file called 'etcsums' to the
         # manifest. See comment directly above.
-        [ -d "$pkg_dir/$pkg/etc" ] && : > "$pkg_dir/$pkg/$pkg_db/$pkg/etcsums"
+        [ -d "$pkg_dir/$pkg/etc" ] && : > "$pkg_dir/$pkg/$pkg_db/$pkg/etcsum"
 
         pkg_strip    "$pkg"
         pkg_manifest "$pkg"
@@ -752,7 +763,7 @@ pkg_build() {
 
     if [ "$pkg_update" ]; then
         return
-    else 
+    else
         prompt "Install built packages? [$*]" && args i "$@"
     fi
 }
@@ -791,25 +802,23 @@ pkg_checksums() {
 pkg_verify() {
     # Verify all package checksums. This is achieved by generating a new set
     # of checksums and then comparing those with the old set.
-    verify_cmd="
-    NR==FNR{a[\$1];next}/^git  .*|^SKIP$/{next}!((\$1)in a){exit 1}
-    "
+    verify_cmd="NR==FNR{a[\$1];next}/^SKIP$/{next}!((\$1)in a){exit 1}"
 
     for pkg do
         repo_dir=$(pkg_find "$pkg")
 
         [ -f "$repo_dir/sources" ] || continue
 
+        sum_type "$repo_dir/checksum"
         verify_sum=$(pkg_checksums "$pkg")
-
         [ "$verify_sum" ] || continue
-        [ -f "$repo_dir/checksums" ] || die "$pkg" "checksums file missing"
+        [ -f "$_chk_file" ] || die "$pkg" "checksums file missing"
 
         # Check that the first column (separated by whitespace) match in both
         # checksum files. If any part of either file differs, mismatch. Abort.
         printf '%s\n' "$verify_sum" |
 
-        awk "$verify_cmd" - "$repo_dir/checksums" || {
+        awk "$verify_cmd" - "$_chk_file" || {
             log "$pkg" "Checksum mismatch"
 
             # Instead of dying above, log it to the terminal. Also define a
@@ -1161,7 +1170,8 @@ pkg_remove() {
     fi
 
     # Make a backup of the etcsums file (if it exists).
-    cp -f "$sys_db/$1/etcsums" "$mak_dir/c" 2>/dev/null ||:
+    sum_type "$sys_db/$1/etcsum"
+    cp -f "$_chk_file" "$mak_dir/c" 2>/dev/null ||:
 
     log "$1" "Removing package"
     pkg_remove_files < "$sys_db/$1/manifest"
@@ -1264,7 +1274,8 @@ pkg_install() {
     # If the package is already installed (and this is an upgrade) make a
     # backup of the manifest and etcsums files.
     cp -f "$sys_db/$pkg_name/manifest" "$mak_dir/m" 2>/dev/null ||:
-    cp -f "$sys_db/$pkg_name/etcsums"  "$mak_dir/c" 2>/dev/null ||:
+    sum_type "$sys_db/$pkg_name/etcsum"
+    cp -f "$_chk_file" "$mak_dir/c" 2>/dev/null ||:
 
     # Install the package's files by iterating over its manifest.
     pkg_install_files -z "$tar_dir/$pkg_name"
@@ -1533,7 +1544,7 @@ args() {
                     continue
                 }
 
-                sums=$(pkg_checksums "$pkg")
+                sums=$(_chk_b3sum=; pkg_checksums "$pkg")
 
                 [ "$sums" ] || {
                     log "$pkg" "No sources needing checksums"
@@ -1544,14 +1555,15 @@ args() {
                 # shellcheck disable=2188
                 printf '%s\n' "$sums" |
 
-                if 2>/dev/null >> "$repo_dir/checksums"; then
-                    tee "$repo_dir/checksums"
-
+                if 2>/dev/null >> "$repo_dir/checksum"; then
+                    tee "$repo_dir/checksum"
+                    rm -f "$repo_dir/checksums"
                 else
                     log "$pkg" "Need permissions to generate checksums"
                     file_owner "$repo_dir"
 
-                    user=$user as_root tee "$repo_dir/checksums"
+                    user=$user as_root \
+                        sh -c "tee '$repo_dir/checksum' && rm -f '$repo_dir/checksums'"
                 fi
 
                 log "$pkg" "Generated checksums"
