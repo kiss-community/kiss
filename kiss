@@ -736,11 +736,7 @@ pkg_build() {
     # shellcheck disable=2046,2086
     set -- $explicit
 
-    if [ "$pkg_update" ]; then
-        return
-    else
-        prompt "Install built packages? [$*]" && args i "$@"
-    fi
+    [ "$pkg_update" ] || prompt "Install built packages? [$*]" && args i "$@"
 }
 
 pkg_checksums() {
