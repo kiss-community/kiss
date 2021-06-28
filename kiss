@@ -21,7 +21,6 @@ die() {
 }
 
 concat() {
-    # input: $1="boom! 1 2 3"; $2=', '
     arr=
 
     # Place $2 between strings and reverse final result.
@@ -29,8 +28,7 @@ concat() {
         arr="$2$s$arr"
     done
 
-    # output: 3, 2, 1, boom!
-    printf '%s' "${arr#$2}"
+    printf %s "${arr#$2}"
 }
 
 contains() {
@@ -581,54 +579,43 @@ pkg_tar() (
 )
 
 add_vertex() {
-    vertex_edges=; vertex=$1
+    case $graph in
+        *" $1:"*) return 1
+    esac
 
-    for vertex_edges in $graph; do
-        _vertex=${vertex_edges%%:*}
-
-        if [ "$_vertex" = "$vertex" ]; then
-            return 1
-        fi
-    done
-
-    graph="$graph $vertex:"
+    graph="$graph $1:"
 }
 
 add_edge() {
-    # TODO implement fast path if vertex is added?
-    add_vertex "$1" ||:
-    add_vertex "$2" ||:
+    add_vertex "$2"
 
-    vertex=$1; edge=$2; vertex_edges=; _graph=
+    # Do fast path if vertex is added.
+    add_vertex "$1" && {
+        graph="$graph$2,"
+        return 0
+    }
+
+    _graph=
 
     # Iterate over dependency graph until we find specified vertex.
-    for vertex_edges in $graph; do
-        # pkg1:pkg2,pkg3 -> pkg1
-        _vertex=${vertex_edges%%:*}
-
+    for node in $graph; do
         # If vertex withith graph not equal to specified vertex, add vertex and
         # edges to new graph and continue.
-        if [ "$_vertex" != "$vertex" ]; then
-            _graph="$_graph $vertex_edges"
+        [ "${node%%:*}" = "$1" ] || {
+            _graph="$_graph $node"
             continue
-        fi
+        }
 
-        # pkg1:pkg2,pkg3 -> pkg2,pkg3
-        _edges=${vertex_edges#*:}
-
-        # pkg2,pkg3 -> pkg2 pkg3
-        #
-        # Word-splitting is intentional.
-        # shellcheck disable=2046,2086
-        { IFS=,; set -- $_edges; unset IFS; }
+        # pkg1:pkg2,pkg3, -> pkg2,pkg3,
+        edges=${node#*:}
 
         # If edges already contains specified edge, return.
-        if contains "$*" "$edge"; then
-            return 1
-        fi
+        case $edges in
+            *"$2,"*) return 1
+        esac
 
         # Append specified edge to vertex and add it to graph.
-        _graph="$_graph $_vertex:${_edges:+$_edges,}$edge"
+        _graph="$_graph $1:$edges$2,"
     done
 
     # Update graph with new one.
@@ -637,54 +624,29 @@ add_edge() {
 
 get_edges() {
     # Iterate over dependency graph until we find specified vertex.
-    for vertex_edges in $graph; do
-        # pkg1:pkg2,pkg3 -> pkg1
-        vertex=${vertex_edges%%:*}
-
+    for node in $graph; do
         # If vertex withith graph equal to specified vertex, print the edges
         # and abort the iteration.
-        if [ "$vertex" = "$1" ]; then
-            # pkg1:pkg2,pkg3 -> pkg2,pkg3
-            edges=${vertex_edges#*:}
-
-            printf '%s' "$edges"
-            return 0
-        fi
+        [ "${node%%:*}" = "$1" ] && {
+            printf %s "${node#*:}"
+            break
+        }
     done
 }
 
 pkg_depgraph() {
     add_vertex "$1" ||:
 
-    # Cache result of pkg_cache function.
-    pkg_cache "$1" && pkg_cached=1 || pkg_cached=
+    # Cache result of pkg_cache function to avoid wasting cpu cycles.
+    # pkg_cache "$1" && pkg_cached=1 || pkg_cached=
 
     # Recurse through the dependencies of the child packages.
     while read -r dep make || [ "$dep" ]; do
         # Skip comments.
         case $dep in \#*) continue; esac
 
-        # Skip build-time dependency if package is already built.
-        # Thanks TAAPArthur for working on this.
-        [ "$make" ] && [ "$pkg_cached" ] && continue
-
-        [ -z "$2" ] && (
-            pkg_list "$dep" >/dev/null || exit
-
-            # If dependency is installed and action isn't update, skip it.
-            #
-            # There is no modification in subshell, just checking.
-            # https://github.com/koalaman/shellcheck/issues/2217
-            # shellcheck disable=2030
-            [ -z "$pkg_update" ] && exit
-
-            read -r sver srel < "$dep/version"
-            read -r rver rrel < "$(pkg_find "$dep")/version"
-
-            # If action is update and version matches with installed one, skip
-            # the dependency. Thanks TAAPArthur for reporting bug.
-            [ "$sver" = "$rver" ] && [ "$srel" = "$rrel" ]
-        ) && continue
+        # Skip already installed dependency.
+        (pkg_list "$dep" >/dev/null) && continue
 
         # If dep successfully added to graph, recurse through the
         # dependencies of dep.
@@ -694,14 +656,12 @@ pkg_depgraph() {
 
 pkg_toposort() {
     # If vertex already processed, return.
-    if contains "$black" "$1"; then
-        return 0
-    fi
+    contains "$black" "$1" && return 0
 
     # Color vertex into grey to keep record of possible circular dependencies.
     grey=" $1 $grey"
 
-    # pkg2,pkg3 -> pkg2 pkg3
+    # pkg2,pkg3, -> pkg2 pkg3
     #
     # Word-splitting is intentional.
     # shellcheck disable=2046,2086
@@ -709,9 +669,8 @@ pkg_toposort() {
 
     # Perform depth-first search.
     for pkg do
-        if contains "$grey" "$pkg"; then
+        contains "$grey" "$pkg" &&
             die "Circular dependency chain: $(concat "$pkg $grey" '->')"
-        fi
 
         pkg_toposort "$pkg" "$(get_edges "$pkg")"
     done
@@ -739,18 +698,12 @@ pkg_order() {
     for pkg do case $pkg in
         /*.tar.*) deps="$deps $pkg " ;;
         *.tar.*)  deps="$deps $ppwd/$pkg " ;;
-        *)        pkg_depgraph "$pkg" raw
+        *)        pkg_depgraph "$pkg"
     esac done
 
     # Perform topological sort of graph to construct dependency chain.
-    for vertex_edges in $graph; do
-        # pkg1:pkg2,pkg3 -> pkg1
-        vertex=${vertex_edges%%:*}
-
-        # pkg1:pkg2,pkg3 -> pkg2,pkg3
-        edges=${vertex_edges#*:}
-
-        pkg_toposort "$vertex" "$edges"
+    for node in $graph; do
+        pkg_toposort "${node%%:*}" "${node#*:}"
     done
 
     # Filter the list, only keeping explicit packages. The purpose of these
@@ -789,24 +742,14 @@ pkg_build() {
     # Perform topological sort of graph to construct dependency chain.
     # The final result will be stored in '$deps'.
     #
-    # The format of dependency graph is: <vertex>:<edge>,<edge2> ...
+    # The format of dependency graph is: <vertex>:<edge>,<edge2>, ...
     # Where ':' is a vertex separator and ',' is an edge separator.
-    for vertex_edges in $graph; do
-        # pkg1:pkg2,pkg3 -> pkg1
-        vertex=${vertex_edges%%:*}
-
-        # pkg1:pkg2,pkg3 -> pkg2,pkg3
-        edges=${vertex_edges#*:}
-
-        pkg_toposort "$vertex" "$edges"
+    for node in $graph; do
+        pkg_toposort "${node%%:*}" "${node#*:}"
     done
 
     # If this is an update, don't always build explicitly passsed packages
     # and instead install pre-built binaries if they exist.
-    #
-    # There is no modification in subshell, therefore no change loss.
-    # https://github.com/koalaman/shellcheck/issues/2217
-    # shellcheck disable=2031
     [ "$pkg_update" ] || explicit_build=$explicit
 
     # If an explicit package is a dependency of another explicit package,
