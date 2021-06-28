@@ -579,23 +579,18 @@ pkg_tar() (
 )
 
 add_vertex() {
-    case $graph in
-        *" $1:"*) return 1
+    case $graph in *" $1:"*)
+        return 1
     esac
 
     graph="$graph $1:"
 }
 
 add_edge() {
-    add_vertex "$2"
-
-    # Do fast path if vertex is added.
-    add_vertex "$1" && {
-        graph="$graph$2,"
-        return 0
-    }
-
     _graph=
+
+    add_vertex "$1"
+    add_vertex "$2"
 
     # Iterate over dependency graph until we find specified vertex.
     for node in $graph; do
@@ -610,8 +605,8 @@ add_edge() {
         edges=${node#*:}
 
         # If edges already contains specified edge, return.
-        case $edges in
-            *"$2,"*) return 1
+        case $edges in *"$2,"*)
+            return 1
         esac
 
         # Append specified edge to vertex and add it to graph.
@@ -636,9 +631,6 @@ get_edges() {
 
 pkg_depgraph() {
     add_vertex "$1" ||:
-
-    # Cache result of pkg_cache function to avoid wasting cpu cycles.
-    # pkg_cache "$1" && pkg_cached=1 || pkg_cached=
 
     # Recurse through the dependencies of the child packages.
     while read -r dep make || [ "$dep" ]; do
@@ -669,10 +661,11 @@ pkg_toposort() {
 
     # Perform depth-first search.
     for pkg do
-        contains "$grey" "$pkg" &&
+        if contains "$grey" "$pkg"; then
             die "Circular dependency chain: $(concat "$pkg $grey" '->')"
-
-        pkg_toposort "$pkg" "$(get_edges "$pkg")"
+        else
+            pkg_toposort "$pkg" "$(get_edges "$pkg")"
+        fi
     done
 
     # Word-splitting is intentional.
