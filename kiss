@@ -281,7 +281,7 @@ pkg_extract() {
                 log "$1" "Cloning ${url%[#@]*}"; {
                     git init
                     git remote add origin "${url%[#@]*}"
-                    git fetch -t --depth 1 origin "$com" || git fetch -t
+                    git fetch -t --filter=tree:0 origin "$com" || git fetch -t
                     git -c advice.detachedHead=0 checkout "${com:-FETCH_HEAD}"
                 } || die "$1" "Failed to clone $src"
             ;;
@@ -608,8 +608,6 @@ pkg_build() {
 
     log "Resolving dependencies"
 
-    nexplicit="$#"
-
     # Mark packages passed on the command-line separately from those
     # detected as dependencies. We need to treat explicitly passed packages
     # differently from those pulled in as dependencies.
@@ -627,22 +625,25 @@ pkg_build() {
     # and instead install pre-built binaries if they exist.
     [ "$pkg_update" ] || explicit_build=$explicit
 
+    set --
+
     # If an explicit package is a dependency of another explicit package,
     # remove it from the explicit list as it needs to be installed as a
     # dependency.
-    for pkg do
-        contains "$deps" "$pkg" || explicit2=" $explicit2 $pkg "
+    for pkg in $explicit; do
+        contains "$deps" "$pkg" || set -- "$@" "$pkg"
     done
-    explicit=$explicit2
+    explicit_cnt=$#
+
+    log "Building: explicit: $*${deps:+, implicit: ${deps## }}"
 
     # See [1] at top of script.
     # shellcheck disable=2046,2086
-    set -- $deps $explicit
 
-    log "Building: $*"
+    set -- $deps "$@"
 
     # Only ask for confirmation if dependencies need to be built.
-    [ "$#" -ne "$nexplicit" ] || [ "$pkg_update" ] && prompt
+    [ "$#" -ne "$explicit_cnt" ] || [ "$pkg_update" ] && prompt
 
     for pkg do pkg_lint "$pkg"; done
 
@@ -754,21 +755,15 @@ pkg_checksums() {
     # Generate checksums for packages.
     repo_dir=$(pkg_find "$1")
 
-    # Support packages without sources. Simply do nothing.
-    [ -f "$repo_dir/sources" ] || return 0
-
     while read -r src dest || [ "$src" ]; do
-        # Skip comments, blank lines and git sources.
-        if [ -z "${src##\#*}" ] || [ -z "${src##git+*}" ]; then
+        # Skip directories, comments, blank lines, and git sources.
+        if [ -z "${src##\#*}" ] || [ -z "${src##git+*}" ] ||
+           [ -d "$repo_dir/$src" ] || [ -d "/$src" ]; then
             :
 
         # Remote source.
         elif [ -z "${src##*://*}" ]; then
             sh256 "$src_dir/$1/${dest:-.}/${src##*/}"
-
-        # Skip directories.
-        elif [ -d "$repo_dir/$src" ] || [ -d "/$src" ]; then
-            :
 
         # Local file (relative).
         elif [ -f "$repo_dir/$src" ]; then
@@ -995,11 +990,11 @@ pkg_install_files() {
     # going down the tree.
     sort "$2/$pkg_db/${2##*/}/manifest" |
 
-    while read -r line; do
+    while read -r file; do
         # Grab the octal permissions so that directory creation
         # preserves permissions.
         # See: [2] at top of script.
-        rwx=$(ls -ld "$2/$line") oct='' b='' o=0
+        rwx=$(ls -ld "$2/${file#/}") oct='' b='' o=0
 
         # Convert the output of 'ls' (rwxrwx---) to octal. This is simply
         # a 1-9 loop with the second digit being the value of the field.
@@ -1015,28 +1010,29 @@ pkg_install_files() {
             [ "$((${c%?} % 3))" = 0 ] && oct=$oct$o o=0
         done
 
+        _file=$KISS_ROOT/${file#/}
+
         # Copy files and create directories (preserving permissions),
         # skipping anything located in /etc/.
         #
         # The 'test' will run with '-e' for no-overwrite and '-z'
         # for overwrite.
-        case $line in /etc/*) ;;
+        case $file in /etc/*) ;;
             */)
                 # Skip directories if they already exist in the file system.
                 # (Think /usr/bin, /usr/lib, etc).
-                [ -d "$KISS_ROOT/$line" ] || mkdir -m "$oct" "$KISS_ROOT/$line"
+                [ -d "$_file" ] || mkdir -m "$oct" "$_file"
             ;;
 
             *)
                 # Skip directories as they're likely symlinks in this case.
                 # Pure directories in manifests have a suffix of '/'.
-                [ -d "$KISS_ROOT/$line" ] || test "$1" "$KISS_ROOT/$line" || {
-                    cp -fP "$2/$line" "$KISS_ROOT/$line"
+                [ -d "$_file" ] || test "$1" "$_file" || {
+                    cp -fP "$2/${file#/}" "$_file"
 
                     # Skip changing permissions of symlinks. This prevents
                     # errors when the symlink exists prior to the target.
-                    [ -h "$KISS_ROOT/$line" ] ||
-                        chmod "$b$oct" "$KISS_ROOT/$line"
+                    [ -h "$_file" ] || chmod "$b$oct" "$_file"
                 }
         esac
     done ||:
@@ -1057,21 +1053,28 @@ pkg_remove_files() {
             }
         esac 2>/dev/null ||:
 
-        file=$KISS_ROOT/$file
+        _file=$KISS_ROOT${file%%/}
 
-        # Remove files.
-        if [ -f "$file" ] && [ ! -h "$file" ]; then
-            rm -f "$file"
+        # Queue all directory symlinks for later removal.
+        if [ -h "$_file" ] && [ -d "$_file" ]; then
+            case $file in /*/*/)
+                set -- "$@" "$_file"
+            esac
 
-        # Remove file symlinks.
-        elif [ -h "$file" ] && [ ! -d "$file" ]; then
-            rm -f "$file"
+        # Remove empty directories.
+        elif [ -d "$_file" ]; then
+            rmdir "$_file" 2>/dev/null ||:
 
-        # Remove directories if empty.
-        elif [ -d "$file" ] && [ ! -h "$file" ]; then
-            rmdir "$file" 2>/dev/null ||:
+        # Remove everything else.
+        else
+            rm -f "$_file"
         fi
     done ||:
+
+    # Remove all broken directory symlinks.
+    for sym do
+        [ -e "$sym" ] || rm -f "$sym"
+    done
 }
 
 pkg_etc() (
@@ -1321,10 +1324,12 @@ pkg_updates() {
 
     # Update each repository in '$KISS_PATH'.
     for repo do
-        # Go to the root of the repository (if it exists).
-        if ! cd "$repo" 2>/dev/null; then
-            log "Skipping $repo, not a directory"; continue
-        fi
+        [ -d "$repo" ] || {
+            log "$repo" " "
+            printf 'Skipping repository, not a directory\n'
+            continue
+        }
+        cd "$repo"
 
         case $(git remote 2>/dev/null) in
             "")
@@ -1626,6 +1631,39 @@ args() {
     fi
 }
 
+create_tmp_dirs() {
+    # Root directory.
+    KISS_ROOT=${KISS_ROOT%"${KISS_ROOT##*[!/]}"}
+
+    # This allows for automatic setup of a KISS chroot and will
+    # do nothing on a normal system.
+    mkdir -p "$KISS_ROOT/" 2>/dev/null ||:
+
+    # System package database.
+    sys_db=$KISS_ROOT/${pkg_db:=var/db/kiss/installed}
+
+    # Top-level cache directory.
+    cac_dir=${XDG_CACHE_HOME:-"${HOME%"${HOME##*[!/]}"}/.cache"}
+    cac_dir=${cac_dir%"${cac_dir##*[!/]}"}/kiss
+
+    # Persistent cache directories.
+    src_dir=$cac_dir/sources
+    log_dir=$cac_dir/logs/${time%-*}
+    bin_dir=$cac_dir/bin
+
+    # Top-level Temporary cache directory.
+    tmp_dir=${KISS_TMPDIR:="$cac_dir/proc"}
+    tmp_dir=${tmp_dir%"${tmp_dir##*[!/]}"}/kiss/$pid
+
+    # Temporary cache directories.
+    mak_dir=$tmp_dir/build
+    pkg_dir=$tmp_dir/pkg
+    tar_dir=$tmp_dir/extract
+
+    mkdir -p "$src_dir" "$log_dir" "$bin_dir" \
+             "$mak_dir" "$pkg_dir" "$tar_dir"
+}
+
 main() {
     # Globally disable globbing and enable exit-on-error.
     set -ef
@@ -1669,28 +1707,7 @@ main() {
     # This is used enough to warrant a place here.
     uid=$(id -u)
 
-    # Ensure that the KISS_ROOT doesn't end with a '/'.
-    KISS_ROOT=${KISS_ROOT%"${KISS_ROOT##*[!/]}"}
-
-    # Define some paths which we will then use throughout the script.
-    sys_db=$KISS_ROOT/${pkg_db:=var/db/kiss/installed}
-
-    # This allows for automatic setup of a KISS chroot and will
-    # do nothing on a normal system.
-    mkdir -p "$KISS_ROOT/" 2>/dev/null ||:
-
-    # Create the required temporary directories and set the variables which
-    # point to them.
-    mkdir -p \
-        "${cac_dir:="${XDG_CACHE_HOME:-"${HOME:?HOME is null}/.cache"}/kiss"}" \
-            "${src_dir:="$cac_dir/sources"}" \
-            "${log_dir:="$cac_dir/logs/${date%-*}"}" \
-            "${bin_dir:="$cac_dir/bin"}" \
-        "${tmp_dir:="${KISS_TMPDIR:="$cac_dir/proc"}/$pid"}" \
-            "${mak_dir:="$tmp_dir/build"}" \
-            "${pkg_dir:="$tmp_dir/pkg"}" \
-            "${tar_dir:="$tmp_dir/extract"}"
-
+    create_tmp_dirs
     args "$@"
 }
 
