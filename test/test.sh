@@ -18,7 +18,8 @@ export KISS_PATH="$KISS_TEST_DIR"
 export KISS_PROMPT=0
 export KISS_TMPDIR="$DIR/temp"
 export XDG_CACHE_HOME="$DIR/cache"
-export PATH="$PWD/..:$PWD/../contrib:$PATH"
+
+[ -z "$USE_INSTALLED_KISS" ] && export PATH="$PWD/..:$PWD/../contrib:$PATH"
 
 for script in "$PWD/tests.d/"*.sh; do
     name="$(basename "$script")"
