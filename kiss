@@ -1415,9 +1415,15 @@ pkg_updates() {
         args i kiss
 
         log "Updated the package manager"
-        log "Re-run 'kiss update' to update your system"
+        log "Re-running 'kiss update' to update your system"
 
-        exit 0
+        if ! BIN=$(command -v kiss); then
+            die "Could not find kiss in PATH"
+        fi
+
+        prompt
+
+        exec "$BIN" update
     }
 
     [ "$1" ] || {
