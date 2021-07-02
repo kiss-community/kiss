@@ -592,6 +592,12 @@ pkg_tar() (
     run_hook post-package "$1"
 )
 
+pkg_build_all() {
+    pkg_order "$@"
+    # shellcheck disable=2086
+    pkg_build $order
+}
+
 pkg_build() {
     # Build packages and turn them into packaged tarballs.
 
@@ -1429,12 +1435,8 @@ pkg_updates() {
 
     # Build all packages requiring an update.
     # See [1] at top of script.
-    # shellcheck disable=2046,2086
-    {
-        pkg_update=1
-        pkg_order "$@"
-        pkg_build $order
-    }
+    pkg_update=1
+    pkg_build_all "$@"
 
     log "Updated all packages"
 }
@@ -1554,7 +1556,7 @@ args() {
             esac
         ;;
 
-        b|build)    pkg_build "${@:?No packages installed}" ;;
+        b|build)    pkg_build_all "${@:?No packages installed}" ;;
         d|download) for pkg do pkg_sources "$pkg"; done ;;
         l|list)     pkg_list "$@" ;;
         u|update)   pkg_updates ;;
