@@ -33,6 +33,10 @@ repology_name() {
             remote=baselayout-kiss
         ;;
 
+        clang)
+            remote=llvm
+        ;;
+
         dash)
             remote=dash-shell
         ;;
@@ -41,22 +45,8 @@ repology_name() {
             remote=fonts:dejavu
         ;;
 
-        dsp)
-            remote=dsp-audio-processing
-        ;;
-
-        emacs-nox)
-            # TODO [community]: Make default emacs no x11?
-            remote=emacs
-        ;;
-
         fd)
             remote=fd-find
-        ;;
-
-        fetsh)
-            # TODO [community]: Rename package?
-            remote=fet.sh
         ;;
 
         firefox-esr)
@@ -82,8 +72,8 @@ repology_name() {
             remote=gnupg
         ;;
 
-        gtk+[23])
-            remote=gtk
+        gtk+3)
+            remote=gtk3+classic
         ;;
 
         gst-*)
@@ -125,10 +115,6 @@ repology_name() {
             remote=links
         ;;
 
-        lux)
-            remote=lux-brightness-ventto
-        ;;
-
         man-pages)
             # TODO: Report to repology.org.
             # man-pages       -> manpages
@@ -136,26 +122,13 @@ repology_name() {
             remote=manpages
         ;;
 
-        netsurf-fb)
-            remote=netsurf
-        ;;
-
         openjpeg2)
             # TODO [community]: Rename package?
             remote=openjpeg
         ;;
 
-        osh)
-            remote=oil-shell
-        ;;
-
         pinentry-dmenu)
             remote=pinentry-dmenu-cemkeylan
-        ;;
-
-        pyqt5)
-            # TODO [community]: Rename package?
-            remote=python-qt
         ;;
 
         python2)
@@ -172,10 +145,6 @@ repology_name() {
 
         sane)
             remote=sane-backends
-        ;;
-
-        spleen-font)
-            remote=fonts:spleen
         ;;
 
         sshfs)
