@@ -29,12 +29,28 @@ repology_name() {
     )
 
     case $remote in
+        age)
+            remote=age-encryption
+        ;;
+
         baselayout)
             remote=baselayout-kiss
         ;;
 
+        bat)
+            remote=bat-cat
+        ;;
+
+        berry)
+            remote=berry-wm
+        ;;
+
         clang)
             remote=llvm
+        ;;
+
+        ctags)
+            remote=exuberant-ctags
         ;;
 
         dash)
@@ -43,6 +59,14 @@ repology_name() {
 
         dejavu-ttf)
             remote=fonts:dejavu
+        ;;
+
+        delta)
+            remote=git-delta
+        ;;
+
+        dust)
+            remote=du-dust
         ;;
 
         fd)
@@ -59,6 +83,10 @@ repology_name() {
 
         gc)
             remote=boehm-gc
+        ;;
+
+        go-ipfs)
+            remote=ipfs
         ;;
 
         gnugrep)
@@ -115,6 +143,14 @@ repology_name() {
             remote=links
         ;;
 
+        lld)
+            remote=llvm
+        ;;
+
+        lpeg)
+            remote=lua:lpeg
+        ;;
+
         man-pages)
             # TODO: Report to repology.org.
             # man-pages       -> manpages
@@ -127,6 +163,11 @@ repology_name() {
             remote=openjpeg
         ;;
 
+        pass)
+            # TODO [community]: Rename package?
+            remote=password-store
+        ;;
+
         pinentry-dmenu)
             remote=pinentry-dmenu-cemkeylan
         ;;
@@ -135,16 +176,24 @@ repology_name() {
             remote=python
         ;;
 
+        python-psutil)
+            remote=python:psutil
+        ;;
+
         qt5*)
             remote=qt
         ;;
 
         rage)
-            remote=rage-encryption-tool
+            remote=rage-encryption
         ;;
 
         sane)
             remote=sane-backends
+        ;;
+
+        slides)
+            remote=slides-presentation-tool
         ;;
 
         sshfs)
@@ -159,12 +208,20 @@ repology_name() {
             remote=st-term
         ;;
 
+        tea)
+            remote=tea-gitea-cli
+        ;;
+
         terminus-font)
             remote=fonts:terminus
         ;;
 
         tiv)
-            remote=tiv-unclassified
+            remote=tiv-terminalimageviewer
+        ;;
+
+        tree)
+            remote=tree-steve-baker
         ;;
 
         unifont)
