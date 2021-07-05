@@ -129,6 +129,10 @@ repology_name() {
             remote=kiss-package-manager
         ;;
 
+        libelf)
+            remote=elfutils
+        ;;
+
         liberation-fonts)
             remote=fonts:liberation
         ;;
