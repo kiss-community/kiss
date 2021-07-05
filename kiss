@@ -734,7 +734,7 @@ pkg_build() {
     done
 
     # Turn the explicit packages into a 'list'.
-    [ $"pkg_update" ] || {
+    [ "$pkg_update" ] || {
     # Intentional, globbing disabled.
     # shellcheck disable=2046,2086
         set -- $explicit
@@ -1562,7 +1562,7 @@ args() {
         l|list)     pkg_list "$@" ;;
         u|update)   pkg_updates ;;
         s|search)   for pkg do pkg_find "$pkg" all; done ;;
-        v|version)  printf '5.4.1\n' ;;
+        v|version)  printf '5.4.2\n' ;;
 
         '')
             log 'kiss [a|b|c|d|i|l|r|s|u|v] [pkg]...'
