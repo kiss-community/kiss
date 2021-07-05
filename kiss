@@ -733,11 +733,14 @@ pkg_build() {
         (KISS_FORCE=1 args i "$pkg")
     done
 
-    # Turn the explicit packages into a 'list'. See [1] at top of script.
+    # Turn the explicit packages into a 'list'.
+    [ $"pkg_update" ] || {
+    # Intentional, globbing disabled.
     # shellcheck disable=2046,2086
-    set -- $explicit
+        set -- $explicit
 
-    [ "$pkg_update" ] || prompt "Install built packages? [$*]" && args i "$@"
+        ! prompt "Install built packages? [$*]" || (args i "$@")
+    }
 }
 
 pkg_checksums() {
