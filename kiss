@@ -279,15 +279,12 @@ pkg_extract() {
             # GNU tar's '--strip-components 1'.
             *://*.tar|*://*.tar.??|*://*.tar.???|*://*.tar.????|*://*.t?z)
                 # Decompress the archive to a temporary .tar archive.
-                decompress "$src_dir/$1/${dest:-.}/${src##*/}" > .ktar
-
-                # Extract the tar archive to the current directory.
-                tar xf .ktar || die "$1" "Couldn't extract ${src##*/}"
+                decompress "$src_dir/$1/${dest:-.}/${src##*/}" | tar xf - || die "$1" "Couldn't extract ${src##*/}"
 
                 # Iterate over all directories in the first level of the
                 # tarball's manifest. This is our equivalent of GNU tar's
                 # '--strip-components 1'.
-                tar tf .ktar | while IFS=/ read -r dir _; do
+                decompress "$src_dir/$1/${dest:-.}/${src##*/}" | tar tf - | cut -d"/" -f1 | while read -r dir ; do
                     # Some tarballs contain './' as the top-level directory,
                     # we need to skip these occurances.
                     [ -d "${dir#.}" ] || continue
@@ -320,10 +317,6 @@ pkg_extract() {
                     # as we may leave files in here due to above.
                     rm -rf "$pid-$dir"
                 done
-
-                # Clean up after ourselves and remove the temporary tar
-                # archive we've created. Not needed at all really.
-                rm -f .ktar
             ;;
 
             # Zip archives.
