@@ -1,0 +1,7 @@
+#!/bin/sh
+# Return a list of files that have no package owner.
+
+kiss alternatives \
+    | cut -d' ' -f2 \
+    | xargs -I{} -P0 \
+    sh -c "owner=\$(kiss owns {}); [ \$owner ] || printf 'warning: {} has no owner\n'"
