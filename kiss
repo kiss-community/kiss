@@ -648,6 +648,8 @@ pkg_strip() {
 }
 
 should_ignore_rpath() {
+    # Intentional, globbing disabled.
+    # shellcheck disable=2086
     { IFS=:; set -- $1; unset IFS; }
 
     for path; do
