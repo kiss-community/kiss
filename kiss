@@ -652,7 +652,7 @@ should_ignore_rpath() {
     # shellcheck disable=2086
     { IFS=:; set -- $1; unset IFS; }
 
-    for path; do
+    for path do
         # TODO maybe check if the RPATH is set to a redundant value
         # like /lib or /usr/lib ?
         # ORIGIN is relative - no need to ignore it.
@@ -726,7 +726,8 @@ pkg_fix_deps() {
                 value=${value%%\]*}
 
                 should_ignore_rpath "$value" && continue 2
-                break # Found RPATH which shouldn't be ignored
+                # Found RPATH which shouldn't be ignored
+                break
             esac
         done <<EOF
 $elf
@@ -734,7 +735,7 @@ EOF
 
         # The readelf mode requires ldd's output to resolve the library
         # path for a given file. If ldd fails, silently skip the file.
-        ldd="$(ldd -- "$pkg_dir/$repo_name$_file" 2>/dev/null)" || continue
+        ldd=$(ldd -- "$pkg_dir/$repo_name$_file" 2>/dev/null) || continue
         ok "$elf" || elf=$ldd
 
         # Iterate over the output of readelf or ldd, extract file names,
