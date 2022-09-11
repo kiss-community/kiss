@@ -647,18 +647,28 @@ pkg_strip() {
     esac done < "$pkg_dir/$1/$pkg_db/$1/manifest" || :
 }
 
+strstrip() {
+    # Intentional, globbing disabled.
+    # shellcheck disable=2086
+    { IFS=$1; set -- $2; unset IFS; }
+
+    for split do
+        ok "$split" && printf '%s' "$split"
+    done
+}
+
 should_ignore_rpath() {
     # Intentional, globbing disabled.
     # shellcheck disable=2086
     { IFS=:; set -- $1; unset IFS; }
 
     for path do
-        # TODO maybe check if the RPATH is set to a redundant value
-        # like /lib or /usr/lib ?
         # ORIGIN is relative - no need to ignore it.
+        # Also ignore /lib and /usr/lib as they're pretty much
+        # guaranteed to be present in the dynamic linker's search path
         # Library rpath: [$ORIGIN/../lib]
         # shellcheck disable=2016
-        case $path in '$ORIGIN'*|'${ORIGIN}'*) continue; esac
+        case $(strstrip '/' "$path") in '$ORIGIN'*|'${ORIGIN}'*|'lib'|'usrlib') continue; esac
         # Non-relative path, should be ignored.
         return 0
     done
