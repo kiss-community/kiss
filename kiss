@@ -647,21 +647,23 @@ pkg_strip() {
     esac done < "$pkg_dir/$1/$pkg_db/$1/manifest" || :
 }
 
-prepend() {
-    pre=$3
-    sep=$2
-    cat=''
-
+should_ignore_rpath() {
     # Intentional, globbing disabled.
     # shellcheck disable=2086
-    { IFS="$sep"; set -- $1; unset IFS; }
+    { IFS=:; set -- $1; unset IFS; }
 
-    for str do
-        ok "$str" || continue
-        cat="$cat$sep$pre$str"
+    for path do
+        # TODO maybe check if the RPATH is set to a redundant value
+        # like /lib or /usr/lib ?
+        # ORIGIN is relative - no need to ignore it.
+        # Library rpath: [$ORIGIN/../lib]
+        # shellcheck disable=2016
+        case $path in '$ORIGIN'*|'${ORIGIN}'*) continue; esac
+        # Non-relative path, should be ignored.
+        return 0
     done
 
-    printf '%s' "$cat"
+    return 1
 }
 
 pkg_fix_deps() {
@@ -688,7 +690,6 @@ pkg_fix_deps() {
         */lib??/?*[!/]|*/lib???/?*[!/]|*/lib????/?*[!/])
 
         unset elf
-        unset lib_rpath
 
         # Attempt to get information from readelf. If this fails (or we
         # are in ldd mode), do full ldd mode (which has the downside of
@@ -700,11 +701,22 @@ pkg_fix_deps() {
         # RPATH/RUNPATH allows the binary to set a relative path for the
         # dynamic loader that might not be present on the rootfs at the time
         # of installation. So, ignoring it can cause the dependency detector to
-        # wrongly add packages.
+        # wrongly add packages. The problem also exists in reverse when the
+        # package links to a library bundled inside it and present in system paths
+        # aswell, and a package update unbundles it - the package gets a dependency
+        # on itself due to RPATH causing ldd to find the bundled lib.
         # Example: libnss3.so exists in /usr/lib at the time of installation
         # But the package links to libnss3 in /usr/lib/PKG/libnss3.so, which is
         # present only in the build dir. So, KISS wrongly adds the installed nss
         # as a dependency.
+        # To avoid dealing with this, we just ignore any libraries with RPATH set.
+        # A solution to this could be to just get the NEEDED libs and RPATH with
+        # readelf and resolve the paths ourselves - with adhoc logic for RPATH and
+        # the build dir.
+        # Another solution could be to resolve the dependencies after installation,
+        # but that can cause issues with reinstalling that tarball later on.
+        # https://github.com/kiss-community/kiss/issues/64
+        # https://github.com/kiss-community/repo/issues/97
         while read -r _ entry_type value; do
             # Technically RUNPATH is supposed to have a higher priority
             # than RPATH but a binary that has both RPATH and RUNPATH set,
@@ -713,7 +725,8 @@ pkg_fix_deps() {
                 value=${value##*\[}
                 value=${value%%\]*}
 
-                lib_rpath="$value"
+                should_ignore_rpath "$value" && continue 2
+                # Found RPATH which shouldn't be ignored
                 break
             esac
         done <<EOF
@@ -722,9 +735,7 @@ EOF
 
         # The readelf mode requires ldd's output to resolve the library
         # path for a given file. If ldd fails, silently skip the file.
-        # We set LD_LIBRARY_PATH to the RPATH we found above to allow ldd
-        # to resolve accurate paths.
-        ldd=$(LD_LIBRARY_PATH=$(prepend "$lib_rpath" : "$pkg_dir/$repo_name") ldd -- "$pkg_dir/$repo_name$_file" 2>/dev/null) || continue
+        ldd=$(ldd -- "$pkg_dir/$repo_name$_file" 2>/dev/null) || continue
         ok "$elf" || elf=$ldd
 
         # Iterate over the output of readelf or ldd, extract file names,
