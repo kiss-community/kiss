@@ -198,6 +198,41 @@ decompress() {
     esac < "$1"
 }
 
+b3() {
+    # Higher level blake3 function which filters out non-existent
+    # files (and also directories).
+    for f do shift
+        [ -d "$f" ] || [ ! -e "$f" ] || set -- "$@" "$f"
+    done
+
+    _b3 "$@"
+}
+
+_b3() {
+    unset hash
+
+    # Skip generation if no arguments.
+    ! equ "$#" 0 || return 0
+
+    IFS=$newline
+
+    # Generate checksums for all input files. This is a single
+    # call to the utility rather than one per file.
+    #
+    # The length of the checksum is set to 33 bytes to
+    # differentiate it from sha256 checksums.
+    _hash=$("$cmd_b3" -l 33 "$@") || die "Failed to generate checksums"
+
+    # Strip the filename from each element.
+    # '<checksum> ?<file>' -> '<checksum>'
+    for sum in $_hash; do
+        hash=$hash${hash:+"$newline"}${sum%% *}
+    done
+
+    printf '%s\n' "$hash"
+    unset IFS
+}
+
 sh256() {
     # Higher level sh256 function which filters out non-existent
     # files (and also directories).
@@ -881,7 +916,7 @@ pkg_etcsums() {
         set -- "$pkg_dir/$repo_name/$etc" "$@"
     esac done < manifest
 
-    sh256 "$@" > etcsums
+    b3 "$@" > etcsums
 }
 
 pkg_tar() {
@@ -1110,7 +1145,7 @@ pkg_checksum_gen() {
         esac
     done < "$repo_dir/sources"
 
-    _sh256 "$@"
+    _b3 "$@"
 }
 
 pkg_verify() {
@@ -1130,6 +1165,10 @@ pkg_verify() {
     # Check that the first column (separated by whitespace) match in both
     # checksum files. If any part of either file differs, mismatch. Abort.
     null "$1" || while read -r chk _ || ok "$1"; do
+        equ "${#chk}" 64 &&
+            log "$repo_name" "sha256 checksum detected." ERROR &&
+            die "$repo_name" "Run 'kiss checksum $repo_name'."
+
         printf '%s\n%s\n' "- ${chk:-missing}" "+ ${1:-no source}"
 
         equ "$1-${chk:-null}" "$chk-$1" ||
@@ -1363,9 +1402,12 @@ pkg_remove_files() {
     # functions allows us to stop duplicating code.
     while read -r file; do
         case $file in /etc/?*[!/])
-            sh256 "$KISS_ROOT/$file" >/dev/null
-
             read -r sum_pkg <&3 ||:
+
+            case "${#sum_pkg}" in
+                64) sh256 "$KISS_ROOT/$file" >/dev/null ;;
+                66) b3    "$KISS_ROOT/$file" >/dev/null ;;
+            esac
 
             equ "$hash" "$sum_pkg" || {
                 printf 'Skipping %s (modified)\n' "$file"
@@ -1398,12 +1440,15 @@ pkg_remove_files() {
 }
 
 pkg_etc() {
-    sh256 "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null
+    read -r sum_old <&3 2>/dev/null ||:
+
+    case "${#sum_old}" in
+        64) sh256 "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null ;;
+        66) b3    "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null ;;
+    esac
 
     sum_new=${hash%%"$newline"*}
     sum_sys=${hash#*"$newline"}
-
-    read -r sum_old <&3 2>/dev/null ||:
 
     # Compare the three checksums to determine what to do.
     case ${sum_old:-null}${sum_sys:-null}${sum_new} in
@@ -2025,6 +2070,9 @@ main() {
         command -v llvm-readelf
     )"} || cmd_elf=ldd
 
+    # b3sum is, for now, the only supported blake3 digest utility.
+    cmd_b3=b3sum
+
     # Figure out which sha256 utility is available.
     cmd_sha=${KISS_CHK:-"$(
         command -v openssl   ||
@@ -2032,7 +2080,7 @@ main() {
         command -v sha256    ||
         command -v shasum    ||
         command -v digest
-    )"} || die "No sha256 utility found"
+    )"} || war "No sha256 utility found"
 
     # Figure out which download utility is available.
     cmd_get=${KISS_GET:-"$(
