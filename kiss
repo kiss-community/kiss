@@ -198,38 +198,6 @@ decompress() {
     esac < "$1"
 }
 
-b3() {
-    # Higher level b3 function which filters out non-existent
-    # files (and also directories).
-    for f do shift
-        [ -d "$f" ] || [ ! -e "$f" ] || set -- "$@" "$f"
-    done
-
-    _b3 "$@"
-}
-
-_b3() {
-    unset hash
-
-    # Skip generation if no arguments.
-    ! equ "$#" 0 || return 0
-
-    IFS=$newline
-
-    # Generate checksums for all input files. This is a single
-    # call to the utility rather than one per file.
-    _hash=$(b3sum "$@") || die "Failed to generate checksums"
-
-    # Strip the filename from each element.
-    # '<checksum> ?<file>' -> '<checksum>'
-    for sum in $_hash; do
-        hash=$hash${hash:+"$newline"}${sum%% *}
-    done
-
-    printf '%s\n' "$hash"
-    unset IFS
-}
-
 sh256() {
     # Higher level sh256 function which filters out non-existent
     # files (and also directories).
@@ -854,7 +822,7 @@ pkg_manifest() {
         printf '%s\n' "$2/$1/$pkg_db/$1/manifest"
 
         ! [ -d "$2/$1/etc" ] ||
-            printf '%s\n' "$2/$1/$pkg_db/$1/etcb3sums"
+            printf '%s\n' "$2/$1/$pkg_db/$1/etcsums"
 
         find "$2/$1" ! -path "$2/$1" -type d -exec printf '%s/\n' {} + \
             -o \( ! -type d -a ! -name \*.la -a ! -name charset.alias \) -print
@@ -900,10 +868,10 @@ pkg_manifest_replace() {
     mv -f "$_tmp_file" "$sys_db/$1/manifest"
 }
 
-pkg_etcb3sums() {
+pkg_etcsums() {
     # Generate checksums for each configuration file in the package's /etc/
     # directory for use in "smart" handling of these files.
-    log "$repo_name" "Generating etcb3sums"
+    log "$repo_name" "Generating etcsums"
 
     # Minor optimization - skip packages without /etc/.
     [ -d "$pkg_dir/$repo_name/etc" ] || return 0
@@ -913,7 +881,7 @@ pkg_etcb3sums() {
         set -- "$pkg_dir/$repo_name/$etc" "$@"
     esac done < manifest
 
-    b3 "$@" > etcb3sums
+    sh256 "$@" > etcsums
 }
 
 pkg_tar() {
@@ -1029,7 +997,7 @@ pkg_build_all() {
         cd "$pkg_dir/$pkg/$pkg_db/$pkg"
 
         pkg_fix_deps "$pkg"
-        pkg_etcb3sums
+        pkg_etcsums
         pkg_tar      "$pkg"
 
         if equ "${prefer_cache:=0}" 1 || ! contains "$explicit" "$pkg"; then
@@ -1122,9 +1090,8 @@ pkg_checksum() {
     pkg_checksum_gen
 
     if ok "$hash"; then
-        printf '%s\n' "$hash" > "$repo_dir/b3sums"
-        rm -f "$repo_dir/checksums"
-        log "$1" "Generated b3sums"
+        printf '%s\n' "$hash" > "$repo_dir/checksums"
+        log "$1" "Generated checksums"
 
     else
         log "$1" "No sources needing checksums"
@@ -1143,7 +1110,7 @@ pkg_checksum_gen() {
         esac
     done < "$repo_dir/sources"
 
-    _b3 "$@"
+    _sh256 "$@"
 }
 
 pkg_verify() {
@@ -1152,11 +1119,6 @@ pkg_verify() {
     #
     # NOTE: repo_dir comes from caller.
     log "$repo_name" "Verifying sources"
-
-    [ -f "$repo_dir/checksums" ] && {
-        log "$repo_name" "Detected sha256 checksums"
-        die "Run 'kiss checksum $repo_name' to generate blake3 checksums"
-    }
 
     # Generate a new set of checksums to compare against.
     pkg_checksum_gen >/dev/null
@@ -1175,7 +1137,7 @@ pkg_verify() {
             die "$repo_name" "Checksum mismatch"
 
         shift "$(($# != 0))"
-    done < "$repo_dir/b3sums"
+    done < "$repo_dir/checksums"
 }
 
 pkg_conflicts() {
@@ -1370,7 +1332,7 @@ pkg_install_files() {
                 #
                 # This is more or less similar to Arch Linux's Pacman with the
                 # user manually handling the .new files when and if they appear.
-                pkg_etc "$3" || continue
+                pkg_etc || continue
             esac
 
             if [ -h "$_file" ]; then
@@ -1396,24 +1358,14 @@ pkg_install_files() {
 }
 
 pkg_remove_files() {
-    case "$1" in
-        *etcb3sums-copy) need_sha= ;;
-        *etcsums-copy) need_sha=1 ;;
-    esac
-    _etcsums="$1"
-    shift 1
     # Remove a file list from the system. This function runs during package
     # installation and package removal. Combining the removals in these two
     # functions allows us to stop duplicating code.
     while read -r file; do
         case $file in /etc/?*[!/])
-            if null "$need_sha"; then
-                b3 "$KISS_ROOT/$file" >/dev/null
-            else
-                sh256 "$KISS_ROOT/$file" >/dev/null
-            fi
+            sh256 "$KISS_ROOT/$file" >/dev/null
 
-            read -r sum_pkg < "$_etcsums" ||:
+            read -r sum_pkg <&3 ||:
 
             equ "$hash" "$sum_pkg" || {
                 printf 'Skipping %s (modified)\n' "$file"
@@ -1446,19 +1398,12 @@ pkg_remove_files() {
 }
 
 pkg_etc() {
-    case "$1" in
-        *etcsums-copy)
-            sh256 "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null
-            ;;
-        *etcb3sums-copy)
-            b3 "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null
-            ;;
-    esac
+    sh256 "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null
 
     sum_new=${hash%%"$newline"*}
     sum_sys=${hash#*"$newline"}
 
-    read -r sum_old < "$1" 2>/dev/null ||:
+    read -r sum_old <&3 2>/dev/null ||:
 
     # Compare the three checksums to determine what to do.
     case ${sum_old:-null}${sum_sys:-null}${sum_new} in
@@ -1517,14 +1462,10 @@ pkg_remove() {
     run_hook     pre-remove "$1" "$sys_db/$1"
 
     # Make a backup of any etcsums if they exist.
-    if [ -f "$sys_db/$1/etcb3sums" ]; then
-        tmp_file_copy "$1" etcb3sums-copy "$sys_db/$1/etcb3sums"
-    elif [ -f "$sys_db/$1/etcsums" ]; then
-        tmp_file_copy "$1" etcsums-copy "$sys_db/$1/etcsums"
-    fi
+    tmp_file_copy "$1" etcsums-copy "$sys_db/$1/etcsums"
 
     log "$1" "Removing package"
-    pkg_remove_files "$_tmp_file" < "$sys_db/$1/manifest"
+    pkg_remove_files < "$sys_db/$1/manifest" 3< "$_tmp_file"
 
     trap_on
     log "$1" "Removed successfully"
@@ -1631,8 +1572,8 @@ pkg_install() {
 
     # If the package is already installed (and this is an upgrade) make a
     # backup of the manifest and etcsums files.
-    tmp_file_copy "$_pkg" manifest-copy  "$sys_db/$_pkg/manifest"
-    tmp_file_copy "$_pkg" etcb3sums-copy "$sys_db/$_pkg/etcb3sums"
+    tmp_file_copy "$_pkg" manifest-copy "$sys_db/$_pkg/manifest"
+    tmp_file_copy "$_pkg"  etcsums-copy "$sys_db/$_pkg/etcsums"
     tmp_file      "$_pkg" manifest-diff
 
     tar_man=$PWD/$pkg_db/$_pkg/manifest
@@ -1649,16 +1590,16 @@ pkg_install() {
 
     if
         # Install the package's files by iterating over its manifest.
-        pkg_install_files -z "$PWD" "$_tmp_file_pre_pre" < "$_tmp_file" &&
+        pkg_install_files -z "$PWD" < "$_tmp_file" 3< "$_tmp_file_pre_pre" &&
 
         # This is the aforementioned step removing any files from the old
         # version of the package if the installation is an update. Each file
         # type has to be specially handled to ensure no system breakage occurs.
-        pkg_remove_files "$_tmp_file_pre_pre" < "$_tmp_file_pre" &&
+        pkg_remove_files < "$_tmp_file_pre" 3< "$_tmp_file_pre_pre" &&
 
         # Install the package's files a second time to fix any mess caused by
         # the above removal of the previous version of the package.
-        pkg_install_files -e "$PWD" "$_tmp_file_pre_pre" < "$_tmp_file"
+        pkg_install_files -e "$PWD" < "$_tmp_file" 3< "$_tmp_file_pre_pre"
 
     then
         trap_on
