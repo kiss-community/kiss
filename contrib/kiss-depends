@@ -3,11 +3,14 @@
 
 pkg=${1:-"${PWD##*/}"}
 
-kiss list "$pkg" >/dev/null || {
+kiss search "$pkg" >/dev/null || {
     printf 'usage: kiss-depends [pkg]\n' >&2
     exit 1
 }
 
-while read -r dep mak || [ "$dep" ]; do
-    printf '%s%s\n' "$dep" "${mak:+ "$mak"}"
-done 2>/dev/null < "$KISS_ROOT/var/db/kiss/installed/$pkg/depends" 
+kiss search "$pkg" | while read -r pkgpath; do
+    printf '=> %s\n' "$pkgpath"
+    while read -r dep mak || [ "$dep" ]; do
+        printf '%s%s\n' "$dep" "${mak:+ "$mak"}"
+    done 2>/dev/null < "$KISS_ROOT/$pkgpath/depends"
+done

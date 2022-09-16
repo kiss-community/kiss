@@ -3,7 +3,5 @@
 
 [ "$1" ] || set -- "${PWD##*/}"
 
-cd "$KISS_ROOT/var/db/kiss/installed"
-
-grep -E "^$1( |$)"  -- */depends
-
+# shellcheck ignore=SC2046
+grep -E "^$1( |$)"  -- $(kiss search \* | sed 's/$/\/depends/') 2>/dev/null
