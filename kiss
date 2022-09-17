@@ -360,14 +360,18 @@ pkg_source_resolve() {
         _des=$src_dir/$1/${3:+"$3/"}${2##*/}
         _des=${_des%[@#]*}/
 
-    # Remote source (cached).
-    elif [ -f "$src_dir/$1/${3:+"$3/"}${2##*/}" ]; then
-        _res=$src_dir/$1/${3:+"$3/"}${2##*/}
-
     # Remote source.
     elif null "${2##*://*}"; then
-        _res=url+$2
-        _des=$src_dir/$1/${3:+"$3/"}${2##*/}
+        # Remote source (cached).
+        # Only check if we detect a remote source to avoid
+        # masking local paths like 'files/test' as cached
+        # if '$src_dir/$1/test' is present
+        if [ -f "$src_dir/$1/${3:+"$3/"}${2##*/}" ]; then
+            _res=$src_dir/$1/${3:+"$3/"}${2##*/}
+        else
+            _res=url+$2
+            _des=$src_dir/$1/${3:+"$3/"}${2##*/}
+        fi
 
     # Local relative dir.
     elif [ -d "$repo_dir/$2" ]; then
