@@ -44,7 +44,7 @@ EOF
         ;;
 
         ctags)
-            remote=ctags-unclassified
+            remote=exuberant-ctags
         ;;
 
         dash)
