@@ -1165,9 +1165,12 @@ pkg_verify() {
     # Check that the first column (separated by whitespace) match in both
     # checksum files. If any part of either file differs, mismatch. Abort.
     null "$1" || while read -r chk _ || ok "$1"; do
-        equ "${#chk}" 64 &&
-            log "$repo_name" "sha256 checksum detected." ERROR &&
-            die "$repo_name" "Run 'kiss checksum $repo_name'."
+        equ "${#chk}" 64 && {
+            log "$repo_name" "Detected sha256 checksums." ERROR
+            log "blake3 is the new checksum provider for kiss. Please run"
+            log "'kiss checksum $repo_name' to regenerate the checksums file."
+            return 1
+        }
 
         printf '%s\n%s\n' "- ${chk:-missing}" "+ ${1:-no source}"
 
