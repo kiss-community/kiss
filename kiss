@@ -449,7 +449,7 @@ pkg_source_url() {
 
 pkg_source_git() {
     com=${2##*[@#]}
-    com=${com#${2%[#@]*}}
+    com=${com#"${2%[#@]*}"}
 
     log "$repo_name" "Checking out ${com:-FETCH_HEAD}"
 
@@ -1867,7 +1867,7 @@ args() {
             # of the current directory as the package name and add the parent
             # directory to the running process' KISS_PATH.
             case ${action%%"${action#?}"}-$# in [!l]-0)
-                export KISS_PATH=${PWD%/*}:$KISS_PATH
+                export KISS_PATH="${PWD%/*}:$KISS_PATH"
                 set -- "${PWD##*/}"
             esac
 
@@ -1875,7 +1875,7 @@ args() {
             # files may differ when repositories change. Removal is not dependent on
             # the state of the repository.
             case $action in r|remove)
-                export KISS_PATH=$sys_db:$KISS_PATH
+                export KISS_PATH="$sys_db:$KISS_PATH"
             esac
 
             # Order the argument list based on dependence.
