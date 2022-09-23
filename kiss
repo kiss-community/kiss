@@ -1662,7 +1662,7 @@ pkg_update() {
         pkg_update_repo
     done
 
-    pkg_upgrade
+    log "Run 'kiss U' to upgrade packages"
 }
 
 pkg_update_repo() {
