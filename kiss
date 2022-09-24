@@ -1946,7 +1946,7 @@ args() {
             log 'list         List installed packages'
             log 'remove       Remove packages'
             log 'search       Search for packages'
-            log 'update       Update the system and repositories'
+            log 'update       Update the repositories'
             log 'upgrade      Update the system'
             log 'version      Package manager version'
 
