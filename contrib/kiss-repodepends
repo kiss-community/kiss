@@ -1,0 +1,16 @@
+#!/bin/sh -ef
+# Display a package's dependencies in repositories
+
+pkg=${1:-"${PWD##*/}"}
+
+kiss search "$pkg" >/dev/null || {
+    printf 'usage: kiss-depends [pkg]\n' >&2
+    exit 1
+}
+
+kiss search "$pkg" | while read -r pkgpath; do
+    printf '=> %s\n' "$pkgpath"
+    while read -r dep mak || [ "$dep" ]; do
+        printf '%s%s\n' "$dep" "${mak:+ "$mak"}"
+    done 2>/dev/null < "$pkgpath/depends"
+done

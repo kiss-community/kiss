@@ -1,0 +1,19 @@
+#!/bin/sh
+# Display packages in all repositories which depend on a package
+
+[ "$1" ] || set -- "${PWD##*/}"
+
+suffix () {
+    case "$1" in *"$2") return 0; esac; return 1
+}
+
+IFS=:
+for repo in $KISS_PATH; do
+    # remove trailing slashes
+    while suffix "$repo" /; do repo="${repo%/}"; done
+    gitdir="$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null || echo "$repo")"
+    case "$gitdir" in "$repo") unset prefix ;; *) prefix="${repo##*/}/" ;; esac
+
+    cd "$gitdir/.." || continue
+    grep -E "^$1([[:space:]]|$)" -- "${gitdir##*/}/$prefix"*/depends 2>/dev/null ||:
+done
