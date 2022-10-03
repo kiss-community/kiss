@@ -1356,6 +1356,10 @@ file_rwx() {
              [st]*) o=$((o + 1)) ;;
         esac
 
+        case $rwx in
+            [tT]*) oct=1$oct
+        esac
+
         case $((${c%?} % 3)) in 0)
             oct=$oct$o
             o=0
