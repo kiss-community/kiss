@@ -1952,6 +1952,7 @@ args() {
         if ok "$1" && ! am_owner "$KISS_ROOT/"; then
             trap_off
 
+            cd "$ppwd"
             as_user env \
                 LOGNAME="$user" \
                 HOME="$HOME" \
