@@ -177,11 +177,19 @@ run_hook() {
 
 run_hook_pkg() {
     # Run a hook from the package's database files.
-    if [ -x "$sys_db/$2/$1" ]; then
+    hook_path="$sys_db/$2/$1"
+    if [ -x "$hook_path" ]; then
         log "$2" "Running $1 hook"
-        "$sys_db/$2/$1"
 
-    elif [ -f "$sys_db/$2/$1" ]; then
+        user=root
+
+        set --
+        equ "$LOGNAME" "$user" || set -- as_user
+
+        "$@" env KISS_ROOT='' \
+            chroot "${KISS_ROOT:-/}" "${hook_path#"$KISS_ROOT"}"
+
+    elif [ -f "$hook_path" ]; then
         war "$2" "skipping $1 hook: not executable"
     fi
 }
