@@ -4,7 +4,8 @@
 # Follow symlinks to any paths.
 case $1 in
     /*)
-        cd -P "$KISS_ROOT${1%/*}"
+        cd -P "${KISS_ROOT:-/}${1%/*}"
+        [ "$PWD" = / ] && KISS_ROOT=
     ;;
 
     */*)
@@ -24,7 +25,7 @@ esac
 # Print the full path to the manifest file which contains
 # the match to our search.
 pkg_owns=$(grep -lFx \
-    "$PWD/${1##*/}" \
+    "${PWD#"$KISS_ROOT"}/${1##*/}" \
     "$KISS_ROOT/var/db/kiss/installed/"*/manifest)
 
 
