@@ -1319,33 +1319,6 @@ pkg_alternatives() {
     fi
 }
 
-pkg_preferred() {
-    set +f
-
-    ok "$1" || set -- "$sys_db/"*
-
-    # shellcheck disable=2046
-    set -- $(
-        for pkg; do
-            pkg="${pkg##*/}"
-            printf '%s\n' "$pkg/manifest"
-        done
-    )
-
-    cd "$sys_db"
-
-    for manifest; do
-        [ -f "$manifest" ] || die "'${manifest%%/*}' not found"
-    done
-
-    pkg_alternatives |
-        cut -d' ' -f2- |
-        grep -Fxf - "$@" /dev/null |
-        sed 's/\/manifest:/ /'
-
-    cd "$OLDPWD"
-}
-
 pkg_swap() {
     # Swap between package alternatives.
     [ -d "$sys_db/$1" ] || die "'$1' not found"
@@ -1542,21 +1515,7 @@ pkg_removable() {
     ! grep -lFx -- "$1" */depends ||
         die "$1" "Not removable, has dependents"
 
-    preferred="$(pkg_preferred "$1")"
-    cnt=0
-
-    IFS=$newline
-
-    for line in $preferred; do
-        printf '%s\n' "$line"
-        : $((cnt+=1))
-    done
-
-    [ ! "$cnt" -gt 0 ] ||
-        die "$1" "Not removable, package leaves behind $cnt orphaned alternative(s)"
-
     set -f
-
     cd "$OLDPWD"
 }
 
@@ -1952,7 +1911,7 @@ args() {
             esac
         ;;
 
-        b|build|c|checksum|d|download|i|install|l|list|p|preferred|r|remove)
+        b|build|c|checksum|d|download|i|install|l|list|r|remove)
             for _arg do case ${action%%"${action#?}"}-$_arg in
                 i-*\!*|i-*\**|i-*\[*|i-*\ *|i-*\]*|i-*"$newline"*)
                     die "Invalid argument: '!*[ ]\\n' ('$_arg')"
@@ -2032,7 +1991,6 @@ args() {
         H|help-ext)     pkg_help_ext "$@" ;;
         i|install)      for pkg do pkg_install "$pkg"; done ;;
         l|list)         pkg_list_version "$@" ;;
-        p|preferred)    pkg_preferred "$@" ;;
         r|remove)       for pkg in $redro; do pkg_remove "$pkg"; done ;;
         s|search)       for pkg do pkg_find "$pkg" all; done ;;
         u|update)       pkg_update ;;
