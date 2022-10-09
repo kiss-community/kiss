@@ -1384,6 +1384,9 @@ pkg_install_files() {
             # Skip directories if they already exist in the file system.
             # (Think /usr/bin, /usr/lib, etc).
             [ -d "$_file" ] || {
+                # The file could be a symlink or a regular file
+                rm -f "$_file"
+
                 file_rwx "$2/${file#/}"
                 mkdir -m "$oct" "$_file"
             }
