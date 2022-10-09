@@ -1418,6 +1418,10 @@ pkg_install_files() {
                 # b) identifiable as related to the package manager.
                 __tmp=${_file%/*}/__kiss-tmp-$_pkg-${file##*/}-$KISS_PID
 
+                # Don't copy the file inside a directory if a directory with
+                # that name alredy exists.
+                [ -d "$_file" ] && rmdir "$_file"
+
                 # Copy the file to the destination directory with the
                 # temporary name created above.
                 cp -fP "$2$file" "$__tmp" &&
