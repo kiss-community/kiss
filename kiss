@@ -1426,6 +1426,7 @@ pkg_install_files() {
                 [ -d "$_file" ] &&
                     if equ "$1" '-z'; then
                         war "Deferring creation of '$_file' as it overlaps with an existing directory"
+                        continue
                     else
                         war "Refusing to replace non-empty directory '$_file' with file"
                         return 1
