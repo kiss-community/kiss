@@ -1414,13 +1414,26 @@ pkg_install_files() {
                 cp -fP "$2$file" "${_file%/*}/."
 
             else
+                # Don't copy the file inside a directory if a directory with
+                # that name already exists. Defer it's creation to after
+                # package removal
+                # This statement will be reached again on the second call to
+                # pkg_install_files
+                # TODO maybe add a sanity check before installation for
+                # checking if the directory will actually be gone by the
+                # second installation i.e no other packages have files inside
+                # that dir (Eg. if you created a file at /usr)
+                [ -d "$_file" ] &&
+                    if equ "$1" '-z'; then
+                        war "Deferring creation of '$_file' as it overlaps with an existing directory"
+                    else
+                        war "Refusing to replace non-empty directory '$_file' with file"
+                        return 1
+                    fi
+
                 # Construct a temporary filename which is a) unique and
                 # b) identifiable as related to the package manager.
                 __tmp=${_file%/*}/__kiss-tmp-$_pkg-${file##*/}-$KISS_PID
-
-                # Don't copy the file inside a directory if a directory with
-                # that name alredy exists.
-                [ -d "$_file" ] && rmdir "$_file"
 
                 # Copy the file to the destination directory with the
                 # temporary name created above.
