@@ -1751,6 +1751,11 @@ pkg_update_repo() {
         # arg1: post-update
         # env:  PWD is path to repository
         run_hook post-update
+
+        [ ! -r MOTD ] || {
+            log "$PWD" "Printing MOTD"
+            cat MOTD
+        }
     }
 }
 
