@@ -898,16 +898,17 @@ pkg_manifest_validate() {
     # NOTE: _pkg comes from caller.
     log "$_pkg" "Checking if manifest valid"
 
+    cnt=0
+
     while read -r line; do
         [ -e "$tar_dir/$_pkg$line" ] || [ -h "$tar_dir/$_pkg$line" ] || {
             printf '%s\n' "$line"
-            set -- "$@" "$line"
+            : $((cnt += 1))
         }
     done < "$pkg_db/$_pkg/manifest"
 
-    for f do
-        die "$_pkg" "manifest contains $# non-existent files"
-    done
+    equ "$cnt" 0 ||
+        die "$_pkg" "manifest contains $cnt non-existent files"
 }
 
 pkg_manifest_replace() {
