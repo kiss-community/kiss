@@ -333,7 +333,7 @@ repo_version() {
 }
 
 get_outdated() {
-    repo=${repo%%/}
+    repo=${PWD%%/}
     printf '\n[Checking Repology for outdated packages in %s]\n\n' "$repo" >&2
 
     for pkg in */; do
