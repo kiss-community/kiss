@@ -935,9 +935,16 @@ pkg_etcsums() {
     # Minor optimization - skip packages without /etc/.
     [ -d "$pkg_dir/$repo_name/etc" ] || return 0
 
-    # Create a list of all files in etc but do it in reverse.
     while read -r etc; do case $etc in /etc/*[!/])
-        set -- "$pkg_dir/$repo_name/$etc" "$@"
+        etc="$pkg_dir/$repo_name/$etc"
+        # Always use hash of /dev/null as the hash for symlinks as it's
+        # possible that they can never be resolved/hashed
+        # (eg. directory, non-existent path, ...)
+        # So they leave missing lines in etcsums which breaks removal of all
+        # other unmodified files in /etc aswell
+        [ -h "$etc" ] && etc=/dev/null
+
+        set -- "$@" "$etc"
     esac done < manifest
 
     b3 "$@" > etcsums
@@ -1437,7 +1444,7 @@ pkg_remove_files() {
 
             case "${#sum_pkg}" in
                 64) sh256 "$KISS_ROOT/$file" >/dev/null ;;
-                66) b3    "$KISS_ROOT/$file" >/dev/null ;;
+                *)  b3    "$KISS_ROOT/$file" >/dev/null ;;
             esac
 
             equ "$hash" "$sum_pkg" || {
@@ -1475,7 +1482,7 @@ pkg_etc() {
 
     case "${#sum_old}" in
         64) sh256 "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null ;;
-        66) b3    "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null ;;
+        *)  b3    "$tar_dir/$_pkg$file" "$KISS_ROOT$file" >/dev/null ;;
     esac
 
     sum_new=${hash%%"$newline"*}
