@@ -93,10 +93,8 @@ tmp_file_copy() {
 prompt() {
     null "$1" || log "$1"
 
-    log "Continue?: Press Enter to continue or Ctrl+D to abort"
-
-    # korn-shell does not exit on interrupt of read.
-    equ "$KISS_PROMPT" 0 || read -r _ || exit 1
+    log "Continue?: Press Enter to continue or Ctrl+C to abort"
+    equ "$KISS_PROMPT" 0 || dd ibs=1 count=1 >/dev/null 2>&1 || exit 1
 }
 
 mkcd() {
