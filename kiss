@@ -1325,6 +1325,27 @@ pkg_alternatives() {
     fi
 }
 
+pkg_preferred() {
+    cd "$sys_db"
+
+    # We only respect first argument
+    if ok "$1"; then
+        [ -d "$1" ] || die "'$1' not found"
+        set -- "$1/manifest"
+    else
+        set +f; set -f -- */manifest
+    fi
+
+    # Pass /dev/null to grep to always ensure that the file name
+    # is printed even if we have a single file
+    pkg_alternatives |
+        cut -d' ' -f2- |
+        grep -Fxf - "$@" /dev/null |
+        sed 's/\/manifest:/ /'
+
+    cd "$OLDPWD"
+}
+
 pkg_swap() {
     # Swap between package alternatives.
     [ -d "$sys_db/$1" ] || die "'$1' not found"
@@ -1523,6 +1544,14 @@ pkg_removable() {
 
     set -f
     cd "$OLDPWD"
+
+    # Check if a package would leave dangling "orphaned" alternatives.
+    tmp_file "$1" owned-conflicts
+    pkg_preferred "$1" | tee "$_tmp_file"
+
+    cnt=$(wc -l < "$_tmp_file")
+    equ "$cnt" 0 ||
+        die "$1" "Not removable, package leaves behind $cnt orphaned alternatives"
 }
 
 pkg_remove() {
@@ -1916,7 +1945,7 @@ args() {
     # Ensure that arguments do not contain invalid characters. Wildcards can
     # not be used here as they would conflict with kiss extensions.
     case $action in
-        a|alternatives)
+        a|alternatives|p|preferred)
             case $1 in *\**|*\!*|*\[*|*\ *|*\]*|*/*|*"$newline"*)
                 die "Invalid argument: '!*[ ]/\\n' ($1)"
             esac
@@ -2002,6 +2031,7 @@ args() {
         H|help-ext)     pkg_help_ext "$@" ;;
         i|install)      for pkg do pkg_install "$pkg"; done ;;
         l|list)         pkg_list_version "$@" ;;
+        p|preferred)    pkg_preferred "$@" ;;
         r|remove)       for pkg in $redro; do pkg_remove "$pkg"; done ;;
         s|search)       for pkg do pkg_find "$pkg" all; done ;;
         u|update)       pkg_update ;;
