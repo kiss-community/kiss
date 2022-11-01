@@ -474,6 +474,16 @@ pkg_source() {
 pkg_source_url() {
     log "$repo_name" "Downloading $2"
 
+    # Download to a temporary file and only move it to the destination if
+    # everything completed successfully, to avoid leaving incomplete downloads
+    # in the cache if it is interrupted.
+    download_dest=$1
+    tmp_file "${1##*/}" download
+    shift
+
+    set -- "$_tmp_file" "$@"
+    rm -f "$_tmp_file"
+
     # Set the arguments based on found download utility.
     case ${cmd_get##*/} in
             aria2c) set -- -d / -o  "$@" ;;
@@ -486,6 +496,8 @@ pkg_source_url() {
         rm -f "$2"
         die "$repo_name" "Failed to download $3"
     }
+
+    mv "$_tmp_file" "$download_dest"
 }
 
 pkg_source_git() {
