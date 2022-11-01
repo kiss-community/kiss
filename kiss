@@ -477,6 +477,7 @@ pkg_source_url() {
     # Download to a temporary file and only move it to the destination if
     # everything completed successfully, to avoid leaving incomplete downloads
     # in the cache if it is interrupted.
+    download_source=$2
     download_dest=$1
     tmp_file "${1##*/}" download
     shift
@@ -493,8 +494,8 @@ pkg_source_url() {
     esac
 
     "$cmd_get" "$@" || {
-        rm -f "$2"
-        die "$repo_name" "Failed to download $3"
+        rm -f "$_tmp_file"
+        die "$repo_name" "Failed to download $download_source"
     }
 
     mv "$_tmp_file" "$download_dest"
