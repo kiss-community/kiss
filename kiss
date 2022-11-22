@@ -94,7 +94,7 @@ prompt() {
     null "$1" || log "$1"
 
     log "Continue?: Press Enter to continue or Ctrl+C to abort"
-    equ "$KISS_PROMPT" 0 || dd ibs=1 count=1 >/dev/null 2>&1 || exit 1
+    equ "$KISS_PROMPT" 0 || dd bs=1 count=1 >/dev/null 2>&1 || exit 1
 }
 
 mkcd() {
