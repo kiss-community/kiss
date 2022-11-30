@@ -535,33 +535,39 @@ pkg_source_tar() {
     tar tf "$_tmp_file_pre" | sort -ut / -k1,1 > "$_tmp_file" ||
         die "$repo_name" "Failed to extract manifest"
 
-    # Iterate over all directories in the first level of the
-    # tarball's manifest. Each directory is moved up a level.
-    while IFS=/ read -r dir _; do case ${dir#.} in *?*)
-        # Skip entries which aren't directories.
-        [ -d "$dir" ] || continue
+    # Only move directories up a level if there is one top-level directory
+    # in the tarball. The tarball could contain all the files without a top
+    # directory, so in those more complicated cases, just give the build file
+    # the original tar structure.
+    case "$(wc -l <"$_tmp_file")" in 1)
+        # Iterate over all directories in the first level of the
+        # tarball's manifest. Each directory is moved up a level.
+        while IFS=/ read -r dir _; do case ${dir#.} in *?*)
+            # Skip entries which aren't directories.
+            [ -d "$dir" ] || continue
 
-        # Move the parent directory to prevent naming conflicts
-        # with the to-be-moved children.
-        mv -f "$dir" "$KISS_PID-$dir"
+            # Move the parent directory to prevent naming conflicts
+            # with the to-be-moved children.
+            mv -f "$dir" "$KISS_PID-$dir"
 
-        # Move all children up a directory level. If the mv command
-        # fails, fallback to copying the remainder of the files.
-        #
-        # We can't use '-exec {} +' with any arguments between
-        # the '{}' and '+' as this is not POSIX. We must also
-        # use '$0' and '$@' to reference all arguments.
-        find "$KISS_PID-$dir/." ! -name . -prune \
-            -exec sh -c 'mv -f "$0" "$@" .' {} + 2>/dev/null ||
+            # Move all children up a directory level. If the mv command
+            # fails, fallback to copying the remainder of the files.
+            #
+            # We can't use '-exec {} +' with any arguments between
+            # the '{}' and '+' as this is not POSIX. We must also
+            # use '$0' and '$@' to reference all arguments.
+            find "$KISS_PID-$dir/." ! -name . -prune \
+                -exec sh -c 'mv -f "$0" "$@" .' {} + 2>/dev/null ||
 
-        find "$KISS_PID-$dir/." ! -name . -prune \
-            -exec sh -c 'cp -fRPp "$0" "$@" .' {} +
+            find "$KISS_PID-$dir/." ! -name . -prune \
+                -exec sh -c 'cp -fRPp "$0" "$@" .' {} +
 
-        # Remove the directory now that all files have been
-        # transferred out of it. This can't be a simple 'rmdir'
-        # as we may leave files in here if any were copied.
-        rm -rf "$KISS_PID-$dir"
-    esac done < "$_tmp_file"
+            # Remove the directory now that all files have been
+            # transferred out of it. This can't be a simple 'rmdir'
+            # as we may leave files in here if any were copied.
+            rm -rf "$KISS_PID-$dir"
+        esac done < "$_tmp_file"
+    esac
 
     # Remove the tarball now that we are done with it.
     rm -f "$_tmp_file_pre"
