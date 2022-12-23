@@ -1,0 +1,182 @@
+.Dd December 23, 2022
+.Dt KISS 1
+.Os
+.Sh NAME
+.Nm kiss
+.Nd package manager
+.Sh SYNOPSIS
+.Nm
+.Op Ar a|b|c|d|H|i|l|p|r|s|u|U|v
+.Op Ar pkg...
+.Sh DESCRIPTION
+.Nm
+is a tiny, self-contained package manager written in POSIX-compliant shell
+script.
+It is written with portability in mind.
+.Pp
+Running
+.Nm
+without any arguments prints help output.
+Every action can be written as the full name or aliased by the first letter:
+.Bl -tag -width Ds
+.It Ar a|alternatives
+List and swap package alternatives
+.It Ar b|build
+Build packages
+.It Ar c|checksum
+Generate checksums
+.It Ar d|download
+Download sources
+.It Ar H|help-ext
+List all installed extensions (see
+.Sx Extensions ) .
+.It Ar i|install
+Install packages
+.It Ar l|list
+List installed packages
+.It Ar p|preferred
+List the owners of all files with alternatives
+.It Ar r|remove
+Remove packages
+.It Ar s|search
+Search for packages
+.It Ar u|update
+Update the repositories
+.It Ar U|upgrade
+Update the system
+.It Ar v|version
+Print package manager version
+.El
+.Ss Extensions
+Anything in the user's
+.Ev $PATH
+which matches the glob
+.Ql kiss-*
+will be directly usable via the package manager.
+The shortest available alias may also be used for each extension.
+The second line in the script acts as a one-line doc string.
+The default extensions are:
+.Bl -tag -width Ds
+.It Ar chroot
+Enter a kiss chroot
+.It Ar depends
+Display a package's dependencies
+.It Ar fork
+Copy a package's repository files into the current directory
+.It Ar help
+Read KISS documentation
+.It Ar link
+Link a repository file to another repository
+.It Ar maintainer
+Find the maintainer of a package
+.It Ar manifest
+Display all files owned by a package
+.It Ar new
+Create a boilerplate package
+.It Ar orphans
+List orphaned packages
+.It Ar outdated
+Check repository for outdated packages
+.It Ar owns
+Check which package owns a file
+.It Ar revdepends
+Display packages which depend on package
+.It Ar size
+Show the size on disk for a package
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev KISS_CHK
+The utility to use for SHA256 checksums.
+.Pp
+Valid: openssl, sha256, sha256sum, shasum, digest.
+Default is the first available in that order.
+.It Ev KISS_CHOICE
+Set to
+.Ql 0
+to disable the alternatives system and error on any detected file
+conflicts.
+.It Ev KISS_COLOR
+Set to
+.Ql 0
+to disable colorful output; otherwise colors are disabled when the
+utput is not a terminal.
+.It Ev KISS_COMPRESS
+Compression method to use for built package tarballs.
+.Pp
+Valid: gz (default), bz2, lzma, lz, xz, zst.
+.It Ev KISS_DEBUG
+Set to
+.Ql 1
+to avoid deleting temporary directories after building packages, for
+debugging.
+.It Ev KISS_ELF
+Which readelf command to use.
+.Pp
+Valid: readelf (default), *-readelf, ldd.
+.It Ev KISS_FORCE
+Set to
+.Ql 1
+to bypass dependency checks and force building/installation/removal
+of packages.
+.It Ev KISS_GET
+Which utility to use when downloading sources.
+.Pp
+Valid: aria2c, axel, curl, wget, wget2.
+Default is the first available in that order.
+.It Ev KISS_HOOK
+A colon-separated list of absolute paths to executable files which are run as
+hooks.
+.It Ev KISS_KEEPLOG
+Set to
+.Ql 1
+to keep build logs for successful builds as well as failing ones.
+.It Ev KISS_PATH
+A colon-separated list of paths to repositories, directories which contain
+packages.
+Repositories earlier in the list have a higher priority in the case of a package
+being found in multiple repos.
+.It Ev KISS_PID
+Used to determine the exact name of temporary directories, can be specified for
+debugging.
+.It Ev KISS_PROMPT
+Set to
+.Ql 0
+to say
+.Dq yes
+and skip all prompts from the package manager.
+.It Ev KISS_ROOT
+Where installed packages will go.
+Can be used to install packages to somewhere other than
+.Pa / .
+.It Ev KISS_STRIP
+Set to
+.Ql 0
+to disable stripping package binaries and libraries globally.
+.It Ev KISS_SU
+Privilege escalation utility to use.
+.Pp
+Valid: ssu, sudo, doas, su, or any other tool compatible with sudo-like
+arguments.
+.It Ev KISS_TMPDIR
+Temporary directory used for builds.
+Can be set to a tmpfs (often
+.Pa /tmp
+for example) so that builds happen in memory
+and are faster.
+.El
+.Sh FILES
+.Nm
+does not use any configuration files.
+Files used in packages are documented in
+.Xr kiss 5 .
+.Sh EXIT STATUS
+.Ex -std
+.Sh SEE ALSO
+.Xr kiss 5 ,
+.Lk https://kisslinux.org/wiki/package-manager
+.Sh AUTHORS
+.Nm
+was created by
+.An Dylan Araps
+and the community.
