@@ -109,7 +109,7 @@ EOF
         ;;
 
         gtk+3)
-            remote=gtk3+classic
+            remote=gtk3-classic
         ;;
 
         gst-*)
