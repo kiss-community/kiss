@@ -236,6 +236,18 @@ EOF
             remote=python
         ;;
 
+        python-docutils)
+            remote=python:docutils
+        ;;
+
+        python-mako)
+            remote=python:mako
+        ;;
+
+        python-markupsafe)
+            remote=python:markupsafe
+        ;;
+
         qt5*)
             remote=qt
         ;;
