@@ -382,8 +382,7 @@ get_outdated() {
 main() {
     set -e
 
-    [ "$1" ] ||
-        die 'usage: kiss [ou]tdated /path/to/repo...'
+    [ "$1" ] || set -- "$PWD"
 
     mkdir -p "${tmp:=${XDG_CACHE_HOME:-"$HOME/.cache"}/kiss/repology}"
 
