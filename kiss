@@ -192,15 +192,26 @@ run_hook_pkg() {
     fi
 }
 
+compress() {
+    case $KISS_COMPRESS in
+        bz2)  bzip2 -c  ;;
+        gz)   gzip  -c  ;;
+        lz)   lzip  -c  ;;
+        lzma) lzma -cT0 ;;
+        xz)   xz   -cT0 ;;
+        zst)  zstd -cT0 ;;
+    esac
+}
+
 decompress() {
     case $1 in
-        *.tbz|*.bz2) bzip2 -d ;;
-        *.lzma)      lzma -dc ;;
-        *.lz)        lzip -dc ;;
-        *.tar)       cat      ;;
-        *.tgz|*.gz)  gzip -d  ;;
-        *.xz|*.txz)  xz -dc ;;
-        *.zst)       zstd -dc ;;
+        *.tar)       cat        ;;
+        *.tbz|*.bz2) bzip2 -dc  ;;
+        *.lz)        lzip  -dc  ;;
+        *.tgz|*.gz)  gzip  -dc  ;;
+        *.lzma)      lzma -dcT0 ;;
+        *.xz|*.txz)  xz   -dcT0 ;;
+        *.zst)       zstd -dcT0 ;;
     esac < "$1"
 }
 
@@ -975,14 +986,7 @@ pkg_tar() {
     cd "$pkg_dir/$1"
 
     # Create a tarball from the contents of the built package.
-    tar cf - . | case $KISS_COMPRESS in
-        bz2)  bzip2 -z ;;
-        gz)   gzip -6  ;;
-        lzma) lzma -z  ;;
-        lz)   lzip -z  ;;
-        xz)   xz -z  ;;
-        zst)  zstd -z  ;;
-    esac > "$_tar_file"
+    tar cf - . | compress > "$_tar_file"
 
     cd "$OLDPWD"
 
