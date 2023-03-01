@@ -76,6 +76,10 @@ EOF
             remote=fd-find
         ;;
 
+        fdm)
+            remote=fdm-email-fetcher
+        ;;
+
         fetsh)
             # TODO [community]: Rename package?
             remote=fet.sh
