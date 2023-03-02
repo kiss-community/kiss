@@ -387,24 +387,11 @@ pkg_cache() {
 pkg_source_resolve() {
     # Given a line of input from the sources file, return an absolute
     # path to the source if it already exists, error if not.
-    unset _res _des _fnr
+    unset _res _des
 
     ok "${2##\#*}" || return 0
 
-    # Surround each replacement with substitutions to handled escaped markers.
-    # First substitution turns '\MARKER' into ' ' (can't appear in sources as
-    # they're already split on whitespace), second replaces 'MARKER' with its
-    # value and the third, turns ' ' into 'MARKER' (dropping \\).
-    fnr "${2%"${2##*[!/]}"}" \
-        \\VERSION \  VERSION "$repo_ver"   \  VERSION \
-        \\RELEASE \  RELEASE "$repo_rel"   \  RELEASE \
-        \\MAJOR   \  MAJOR   "$repo_major" \  MAJOR \
-        \\MINOR   \  MINOR   "$repo_minor" \  MINOR \
-        \\PATCH   \  PATCH   "$repo_patch" \  PATCH \
-        \\IDENT   \  IDENT   "$repo_ident" \  IDENT \
-        \\PACKAGE \  PACKAGE "$repo_name"  \  PACKAGE
-
-    set -- "$1" "$_fnr" "${3%"${3##*[!/]}"}" "$4"
+    set -- "$1" "$2" "${3%"${3##*[!/]}"}" "$4"
 
     # Git repository.
     if null "${2##git+*}"; then
@@ -463,9 +450,8 @@ pkg_source() {
 
         # arg1: pre-source
         # arg2: package name
-        # arg3: verbatim source
-        # arg4: resolved source
-        run_hook pre-source "$1" "$src" "$_fnr"
+        # arg3: source
+        run_hook pre-source "$1" "$src"
 
         # '$2' is set when this function is called from 'kiss c' and it is used
         # here to skip calling the Git code.
@@ -476,8 +462,8 @@ pkg_source() {
 
         # arg1: post-source
         # arg2: package name
-        # arg3: verbatim source
-        # arg4: resolved source
+        # arg3: source
+        # arg4: destination
         run_hook post-source "$1" "$src" "${_des:-"$_res"}"
     done < "$repo_dir/sources"
 }
