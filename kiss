@@ -1119,16 +1119,14 @@ pkg_build() {
         # Give the script a modified environment. Define toolchain program
         # environment variables assuming a generic environment by default.
         #
-        # Define DESTDIR and GOPATH to sane defaults as their use is mandatory
-        # in anything using autotools, meson, cmake, etc. Define KISS_ROOT as
-        # the sanitized value used internally by the package manager. This is
-        # safe to join with other paths.
+        # Define GOPATH to sane defaults as its use is mandatory for Go projects.
+        # Define KISS_ROOT as the sanitized value used internally by the package
+        # manager. This is safe to join with other paths.
         AR="${AR:-ar}" \
         CC="${CC:-cc}" \
         CXX="${CXX:-c++}" \
         NM="${NM:-nm}" \
         RANLIB="${RANLIB:-ranlib}" \
-        DESTDIR="$pkg_dir/$1" \
         RUSTFLAGS="--remap-path-prefix=$PWD=. $RUSTFLAGS" \
         GOFLAGS="-trimpath -modcacherw $GOFLAGS" \
         GOPATH="$PWD/go" \
