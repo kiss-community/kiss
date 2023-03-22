@@ -8,11 +8,9 @@
 }
 
 kiss search "$@" | sort -u | while read -r repo; do cd "$repo"
-    m=$(git log -1 -- version 2>/dev/null) ||:
-    m=${m##*Author: }
-    m=${m%%>*}
+    m=$(git log -1 --format='%an <%ae>' -- version 2>/dev/null) ||:
 
     [ "$m" ] || continue
 
-    printf '=> %s\n%s>\n' "$PWD" "$m"
+    printf '=> %s\n%s\n' "$PWD" "$m"
 done
