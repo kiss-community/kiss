@@ -12,5 +12,5 @@ kiss search "$@" | sort -u | while read -r repo; do cd "$repo"
 
     [ "$m" ] || continue
 
-    printf '=> %s\n%s\n' "$PWD" "$m"
+    printf '%s\t%s\n' "$PWD" "$m"
 done
