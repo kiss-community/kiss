@@ -314,15 +314,6 @@ pkg_find_version() {
         die "$pkg" "Build file not found or not executable"
 }
 
-pkg_find_version_split() {
-    pkg_find_version "$@"
-
-    # Split the version on '.+-_' to obtain individual components.
-    IFS=.+-_ read -r repo_major repo_minor repo_patch repo_ident <<EOF
-$repo_ver
-EOF
-}
-
 pkg_find() {
     _pkg_find "$@" || die "'$1' not found"
 }
@@ -439,7 +430,7 @@ pkg_source_resolve() {
 pkg_source() {
     # Download any remote package sources. The existence of local files is
     # also checked.
-    pkg_find_version_split "$1"
+    pkg_find_version "$1"
 
     # Support packages without sources. Simply do nothing.
     [ -f "$repo_dir/sources" ] || return 0
@@ -1048,7 +1039,7 @@ pkg_build_all() {
     for pkg do
         log "$pkg" "Building package ($((_build_cur+=1))/$#)"
 
-        pkg_find_version_split "$pkg"
+        pkg_find_version "$pkg"
 
         # arg1: queue-status
         # arg2: package name
