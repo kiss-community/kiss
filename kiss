@@ -2033,13 +2033,14 @@ args() {
         v|version)      printf '5.6.4\n' ;;
 
         '')
-            log 'kiss [a|b|c|d|i|l|r|s|u|U|v] [pkg]...'
+            log 'kiss [a|b|c|d|i|l|p|r|s|u|U|v] [pkg]...'
             log 'alternatives List and swap alternatives'
             log 'build        Build packages'
             log 'checksum     Generate checksums'
             log 'download     Download sources'
             log 'install      Install packages'
             log 'list         List installed packages'
+            log 'preferred    List owners of files with alternatives'
             log 'remove       Remove packages'
             log 'search       Search for packages'
             log 'update       Update the repositories'
