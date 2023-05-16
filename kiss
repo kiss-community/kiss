@@ -1998,14 +1998,14 @@ args() {
                 LOGNAME="$user" \
                 HOME="$HOME" \
                 XDG_CACHE_HOME="$XDG_CACHE_HOME" \
-                KISS_COMPRESS="$KISS_COMPRESS" \
-                KISS_PATH="$KISS_PATH" \
-                KISS_FORCE="$KISS_FORCE" \
-                KISS_ROOT="$KISS_ROOT" \
                 KISS_CHOICE="$KISS_CHOICE" \
                 KISS_COLOR="$KISS_COLOR" \
-                KISS_TMPDIR="$KISS_TMPDIR" \
+                KISS_COMPRESS="$KISS_COMPRESS" \
+                KISS_FORCE="$KISS_FORCE" \
+                KISS_PATH="$KISS_PATH" \
                 KISS_PID="$KISS_PID" \
+                KISS_ROOT="$KISS_ROOT" \
+                KISS_TMPDIR="$KISS_TMPDIR" \
                 _KISS_LVL="$_KISS_LVL" \
                 "$0" "$action" "$@"
 
