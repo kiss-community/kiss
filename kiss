@@ -2002,6 +2002,7 @@ args() {
                 KISS_COLOR="$KISS_COLOR" \
                 KISS_COMPRESS="$KISS_COMPRESS" \
                 KISS_FORCE="$KISS_FORCE" \
+                KISS_HOOK="$KISS_HOOK" \
                 KISS_PATH="$KISS_PATH" \
                 KISS_PID="$KISS_PID" \
                 KISS_ROOT="$KISS_ROOT" \
