@@ -330,7 +330,10 @@ _pkg_find() {
     for _find_path in $4 "${3:-$sys_db}"; do set +f
         ok "$_find_path" || continue
         for _find_pkg in "$_find_path/"$1; do
-            test "${3:--d}" "$_find_pkg" && set -f -- "$@" "$_find_pkg"
+            test "${3:--d}" "$_find_pkg" && {
+                set -f -- "$@" "$_find_pkg"
+                case $2- in -) break 2 ;; esac
+            }
         done
     done
 
