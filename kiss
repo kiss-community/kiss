@@ -2007,6 +2007,7 @@ args() {
                 KISS_PID="$KISS_PID" \
                 KISS_ROOT="$KISS_ROOT" \
                 KISS_TMPDIR="$KISS_TMPDIR" \
+                _KISS_DATE="$time" \
                 _KISS_LVL="$_KISS_LVL" \
                 "$0" "$action" "$@"
 
@@ -2160,7 +2161,10 @@ main() {
 
     # Store the date and time of script invocation to be used as the name of
     # the log files the package manager creates during builds.
-    time=$(date +%Y-%m-%d-%H:%M)
+    # Accept _KISS_DATE in case this process has been called by a kiss process
+    # started on a different day, which could cause permission issues if we
+    # create log_dir as root.
+    time=${_KISS_DATE:-"$(date +%Y-%m-%d-%H:%M)"}
 
     create_tmp_dirs
     trap_on
