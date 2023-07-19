@@ -1971,12 +1971,14 @@ args() {
                 export KISS_PATH="$sys_db:$KISS_PATH"
             esac
 
-            # Order the argument list based on dependence.
-            pkg_order "$@"
+            case $action in b|build|i|install|r|remove)
+                # Order the argument list based on dependence.
+                pkg_order "$@"
 
-            # Intentional, globbing disabled.
-            # shellcheck disable=2046,2086
-            set -- $order
+                # Intentional, globbing disabled.
+                # shellcheck disable=2046,2086
+                set -- $order
+            esac
         ;;
     esac
 
