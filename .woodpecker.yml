@@ -1,0 +1,9 @@
+pipeline:
+  build:
+    image: alpine
+    when:
+      branch: [ master ]
+    commands: |
+      apk add --no-cache shellcheck
+
+      shellcheck kiss contrib/*
