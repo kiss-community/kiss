@@ -1355,8 +1355,9 @@ pkg_swap() {
         log "Swapping '$2' from '$_owns' to '$1'"
 
         # Convert the current owner to an alternative and rewrite its manifest
-        # file to reflect this.
+        # file to reflect this. Also ensure that timestamps are preserved.
         cp -Pf "$KISS_ROOT$2" "$sys_ch/$_owns>${_fnr#*>}"
+        ! [ -h "$KISS_ROOT$2" ] && touch -r "$KISS_ROOT$2" "$sys_ch/$_owns>${_fnr#*>}"
         pkg_manifest_replace "$_owns" "$2" "/$cho_db/$_owns>${_fnr#*>}"
     fi
 
@@ -1437,6 +1438,9 @@ pkg_install_files() {
                 # Copy the file to the destination directory with the
                 # temporary name created above.
                 cp -fP "$2$file" "$__tmp" &&
+
+                # Ensure timestamps are preserved.
+                if ! [ -h "$2$file" ]; then touch -r "$2$file" "$__tmp"; fi &&
 
                 # Atomically move the temporary file to its final
                 # destination. The running processes will either get
