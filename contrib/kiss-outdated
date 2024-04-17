@@ -363,7 +363,7 @@ get_outdated() {
 
     mkcd "$tmp/${repo##*/}"
 
-    curl -SsZ --parallel-max 16 --remote-name-all "$@" ||
+    curl -SsZA 'kiss-outdated' --parallel-max 16 --remote-name-all "$@" ||
         die 'fatal: network error'
 
     for _pkg in "$OLDPWD"/*/; do
