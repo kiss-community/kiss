@@ -39,6 +39,10 @@ EOF
             remote=bat-cat
         ;;
 
+        cairo)
+            remote=cairo-graphics-library
+        ;;
+
         clang)
             remote=llvm
         ;;
@@ -227,29 +231,17 @@ EOF
             remote=python:pybind11
         ;;
 
-        python-psutil)
-            remote=python:psutil
-        ;;
-
         pyqt5)
             # TODO [community]: Rename package?
             remote=python-qt
         ;;
 
+        python-*)
+            remote=python:${remote#*-}
+        ;;
+
         python2)
             remote=python
-        ;;
-
-        python-docutils)
-            remote=python:docutils
-        ;;
-
-        python-mako)
-            remote=python:mako
-        ;;
-
-        python-markupsafe)
-            remote=python:markupsafe
         ;;
 
         qt5*)
@@ -258,6 +250,10 @@ EOF
 
         rage)
             remote=rage-encryption
+        ;;
+
+        samurai)
+            remote=samurai-build-tool
         ;;
 
         sane)
@@ -302,6 +298,10 @@ EOF
 
         tree)
             remote=tree-steve-baker
+        ;;
+
+        ttf-croscore)
+            remote=fonts:croscore
         ;;
 
         ttf-font-awesome)
