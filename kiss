@@ -2056,7 +2056,7 @@ args() {
             # which call the package manager do not increment the value
             # further than the parent instance.
             pkg_find "kiss-$action*" "" -x "$PATH"
-            _KISS_LVL=0 KISS_PID= "$repo_dir" "$@"
+            _KISS_LVL=0 KISS_PID='' "$repo_dir" "$@"
         ;;
     esac
 }
