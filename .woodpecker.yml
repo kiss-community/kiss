@@ -3,6 +3,7 @@ steps:
     image: alpine
     when:
       branch: [ master ]
+      event: [push, pull_request]
     commands: |
       apk add --no-cache shellcheck
 
